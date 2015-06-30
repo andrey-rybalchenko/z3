@@ -1113,7 +1113,7 @@ namespace datalog {
             }
 
             expr_ref expr = cube_to_formula(node->m_cube, si->m_preds);
-            expr_ref_vector args = si->get_fresh_args("s");
+            expr_ref_vector args = si->get_fresh_abstracted_args("s");
             expr_ref to_rank = m_subst.apply(expr, m_subst.build(si->m_abstracted_vars, args));
 
             return well_founded(args, to_rank, NULL, NULL);

@@ -23,8 +23,8 @@ namespace datalog {
     expr_ref_vector rule_info::get_abstracted_args() const {
         if (get_decl()) {
             expr_ref_vector args(m);
-            for (unsigned i = 0; i < get_decl()->m_explicit_args.size(); ++i) {
-                if (!get_decl()->m_explicit_args.get(i)) {
+            for (unsigned i = 0; i < get_decl()->m_arg_kinds.size(); ++i) {
+                if (get_decl()->m_arg_kinds[i] == symbol_info::abstracted_arg) {
                     args.push_back(get_head()->get_arg(i));
                 }
             }
@@ -38,8 +38,8 @@ namespace datalog {
     expr_ref_vector rule_info::get_abstracted_args(unsigned i) const {
         CASSERT("predabst", get_decl(i));
         expr_ref_vector args(m);
-        for (unsigned j = 0; j < get_decl(i)->m_explicit_args.size(); ++j) {
-            if (!get_decl(i)->m_explicit_args.get(j)) {
+        for (unsigned j = 0; j < get_decl(i)->m_arg_kinds.size(); ++j) {
+            if (get_decl(i)->m_arg_kinds[j] == symbol_info::abstracted_arg) {
                 args.push_back(get_tail(i)->get_arg(j));
             }
         }
@@ -49,8 +49,8 @@ namespace datalog {
     expr_ref_vector rule_info::get_explicit_args() const {
         if (get_decl()) {
             expr_ref_vector args(m);
-            for (unsigned i = 0; i < get_decl()->m_explicit_args.size(); ++i) {
-                if (get_decl()->m_explicit_args.get(i)) {
+            for (unsigned i = 0; i < get_decl()->m_arg_kinds.size(); ++i) {
+                if (get_decl()->m_arg_kinds[i] == symbol_info::explicit_arg) {
                     args.push_back(get_head()->get_arg(i));
                 }
             }
@@ -64,8 +64,8 @@ namespace datalog {
     expr_ref_vector rule_info::get_explicit_args(unsigned i) const {
         CASSERT("predabst", get_decl(i));
         expr_ref_vector args(m);
-        for (unsigned j = 0; j < get_decl(i)->m_explicit_args.size(); ++j) {
-            if (get_decl(i)->m_explicit_args.get(j)) {
+        for (unsigned j = 0; j < get_decl(i)->m_arg_kinds.size(); ++j) {
+            if (get_decl(i)->m_arg_kinds[j] == symbol_info::explicit_arg) {
                 args.push_back(get_tail(i)->get_arg(j));
             }
         }

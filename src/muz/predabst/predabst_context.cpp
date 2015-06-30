@@ -383,7 +383,7 @@ namespace datalog {
                         core_tree_wf_info core_info_wf(m);
                         expr_ref_vector error_args(m);
                         if (error_node->m_symbol) {
-                            error_args.swap(error_node->m_symbol->get_fresh_args("r"));
+                            error_args.swap(error_node->m_symbol->get_fresh_abstracted_args("r"));
                         }
                         if (not_reachable_without_abstraction(error_node, error_args, core_info)) {
                             // The problem node isn't reachable without abstraction.

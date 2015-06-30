@@ -117,14 +117,16 @@ namespace datalog {
     };
 
     struct symbol_info : public fdecl_info {
-        bool                     const m_is_dwf;
+		enum arg_kind { abstracted_arg, explicit_arg };
+		
+		bool                     const m_is_dwf;
         expr_ref_vector          m_initial_preds;
         expr_ref_vector          m_preds;
-        func_decl_ref_vector     m_var_names;
-        vector<bool>             m_explicit_args;
-        var_ref_vector           m_abstracted_vars;
+		vector<arg_kind>         m_arg_kinds;
+		func_decl_ref_vector     m_var_names;
+		var_ref_vector           m_abstracted_vars;
         var_ref_vector           m_explicit_vars;
-        vector<rule_info const*> m_users;
+		vector<rule_info const*> m_users;
 
         symbol_info(func_decl* fdecl, bool is_dwf, ast_manager& m) :
             fdecl_info(fdecl),
@@ -134,16 +136,16 @@ namespace datalog {
             m_var_names(m),
             m_abstracted_vars(m),
             m_explicit_vars(m) {
-            m_var_names.reserve(m_fdecl->get_arity());
-            m_explicit_args.reserve(m_fdecl->get_arity());
+			m_arg_kinds.reserve(m_fdecl->get_arity());
+			m_var_names.reserve(m_fdecl->get_arity());
         }
 
-        expr_ref_vector get_fresh_args(char const* prefix) const {
+        expr_ref_vector get_fresh_abstracted_args(char const* prefix) const {
             ast_manager& m = m_preds.m();
             expr_ref_vector args = get_arg_fresh_consts(m_fdecl, prefix, m);
             expr_ref_vector abstracted_args(m);
-            for (unsigned i = 0; i < m_explicit_args.size(); ++i) {
-                if (!m_explicit_args.get(i)) {
+            for (unsigned i = 0; i < m_arg_kinds.size(); ++i) {
+                if (m_arg_kinds[i] == abstracted_arg) {
                     abstracted_args.push_back(args.get(i));
                 }
             }

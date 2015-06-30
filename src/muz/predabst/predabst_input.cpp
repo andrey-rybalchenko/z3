@@ -83,19 +83,19 @@ namespace datalog {
                 symbol_info* si = m_input->m_symbols[i];
                 var_ref_vector vars = get_arg_vars(si->m_fdecl, m);
                 for (unsigned j = 0; j < vars.size(); ++j) {
-                    if (si->m_explicit_args.get(j)) {
-                        si->m_explicit_vars.push_back(vars.get(j));
-                    }
+                    if (si->m_arg_kinds[j] == symbol_info::abstracted_arg) {
+						si->m_abstracted_vars.push_back(vars.get(j));
+					}
                     else {
-                        si->m_abstracted_vars.push_back(vars.get(j));
-                    }
+						si->m_explicit_vars.push_back(vars.get(j));
+					}
                 }
 
                 if (si->m_is_dwf) {
-                    CASSERT("predabst", si->m_explicit_args.size() % 2 == 0);
-                    unsigned n = si->m_explicit_args.size() / 2;
+                    CASSERT("predabst", si->m_arg_kinds.size() % 2 == 0);
+                    unsigned n = si->m_arg_kinds.size() / 2;
                     for (unsigned j = 0; j < n; ++j) {
-                        if (si->m_explicit_args[j] != si->m_explicit_args[j + n]) {
+                        if (si->m_arg_kinds[j] != si->m_arg_kinds[j + n]) {
                             failwith("DWF predicate symbol " + si->m_fdecl->get_name().str() + " has arguments " + to_string(j) + " and " + to_string(j + n) + " that are not both explicit or non-explicit");
                         }
                     }
@@ -495,13 +495,13 @@ namespace datalog {
                     failwith("explicit argument list for " + suffix.str() + " has __exparg__ predicate with non-variable argument");
                 }
                 unsigned j = vector_find(args, to_var(tail->get_arg(0)));
-                if (si->m_explicit_args.get(j)) {
+                if (si->m_arg_kinds[j] == symbol_info::explicit_arg) {
                     failwith("explicit argument list for " + suffix.str() + " has duplicate __exparg__ declaration for argument " + to_string(j));
                 }
                 m_stats.m_num_explicit_arguments++;
                 if (m_fp_params.predabst_use_exp_eval()) {
                     STRACE("predabst", tout << "Found explicit argument declaration for argument " << j << "\n";);
-                    si->m_explicit_args[j] = true;
+                    si->m_arg_kinds[j] = symbol_info::explicit_arg;
                 }
                 else {
                     STRACE("predabst", tout << "Ignoring explicit argument declaration for argument " << j << "\n";);
@@ -555,7 +555,7 @@ namespace datalog {
                     failwith("argument name list for " + suffix.str() + " has non-unique name for argument " + to_string(j));
                 }
                 m_stats.m_num_named_arguments++;
-                if (si->m_explicit_args.get(j)) {
+                if (si->m_arg_kinds[j] == symbol_info::explicit_arg) {
                     STRACE("predabst", tout << "Ignoring name for explicit argument " << j << "\n";);
                 }
                 else {
@@ -584,7 +584,7 @@ namespace datalog {
 
             var_ref_vector abstracted_args(m);
             for (unsigned i = 0; i < args.size(); ++i) {
-                if (!si->m_explicit_args.get(i)) {
+                if (si->m_arg_kinds[i] == symbol_info::abstracted_arg) {
                     abstracted_args.push_back(args.get(i));
                 }
             }
