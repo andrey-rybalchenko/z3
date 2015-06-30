@@ -24,6 +24,7 @@ Revision History:
 #include "used_vars.h"
 #include "dl_rule.h"
 
+// Returns true if v1 and v2 are equal.
 template<typename V>
 inline bool vector_equals(V const& v1, V const& v2) {
     if (v1.size() != v2.size()) {
@@ -37,6 +38,7 @@ inline bool vector_equals(V const& v1, V const& v2) {
     return true;
 }
 
+// Returns the concatenation of v1 and v2.
 template<typename V>
 inline V vector_concat(V const& v1, V const& v2) {
     V v(v1);
@@ -44,6 +46,7 @@ inline V vector_concat(V const& v1, V const& v2) {
     return v;
 }
 
+// Returns the concatenation of v1 (specified as a size (n1) and pointer to data (p1)) and v2.
 template<typename V, typename T>
 inline V vector_concat(unsigned n1, T* const* p1, V const& v2) {
     V v(v2.m(), n1, p1);
@@ -51,6 +54,7 @@ inline V vector_concat(unsigned n1, T* const* p1, V const& v2) {
     return v;
 }
 
+// Returns the index of the first occurrence of elem in v.
 template<typename V, typename T>
 inline unsigned vector_find(V const& v, T const* elem) {
     for (unsigned i = 0; i < v.size(); ++i) {
@@ -62,6 +66,7 @@ inline unsigned vector_find(V const& v, T const* elem) {
     return UINT_MAX;
 }
 
+// Returns the intersection of v1 and v2.
 template<typename V>
 inline V vector_intersection(V const& v1, V const& v2) {
     V intersection(v1.m());
@@ -75,7 +80,7 @@ inline V vector_intersection(V const& v1, V const& v2) {
 
 // Returns true if v1 is a (possibly non-strict) subset of v2.
 template<typename V>
-static bool vector_subset(V const& v1, V const& v2) {
+inline bool vector_subset(V const& v1, V const& v2) {
     for (unsigned i = 0; i < v1.size(); ++i) {
         if (!v2.contains(v1.get(i))) {
             return false;
@@ -98,9 +103,11 @@ inline std::ostream& operator<<(std::ostream& out, vector<T> const& v) {
 template<typename T, typename TManager>
 std::ostream& operator<<(std::ostream& out, obj_ref<T, TManager> const& e) {
     params_ref p;
+	// Don't use 'let's for sub-expressions.
     p.set_uint("max_depth", UINT_MAX);
     p.set_uint("min_alias_size", UINT_MAX);
-    p.set_bool("single_line", true);
+	// Don't insert any newlines.
+	p.set_bool("single_line", true);
     out << mk_pp(e, e.m(), p);
     return out;
 }
@@ -122,41 +129,86 @@ std::ostream& operator<<(std::ostream& out, ref_vector<T, TManager> const& v) {
     return out;
 }
 
+// Converts the type of the argument, which is assumed to contain only variables.
 var_ref_vector to_vars(expr_ref_vector const& exprs);
 
+// Returns true if the sort of e is bool.
 bool sort_is_bool(expr* e, ast_manager& m);
+
+// Returns true if the sort of e is int.
 bool sort_is_int(expr* e, ast_manager& m);
 
+// Returns the list of disjuncts of a (possibly nested) 'or' expression,
+// eliminating those that are literally false.
 expr_ref_vector get_disj_terms(expr_ref const& e);
+
+// Returns the list of conjuncts of a (possibly nested) 'and' expression,
+// eliminating those that are literally true.
 expr_ref_vector get_conj_terms(expr_ref const& e);
+
+// Returns the list of addends of a (possibly nested) 'add' expression,
+// eliminating those that are literally zero.
 expr_ref_vector get_additive_terms(expr_ref const& e);
+
+// Returns the list of multiplicands of a (possibly nested) 'mul' expression,
+// eliminating those that are literally one.
 expr_ref_vector get_multiplicative_factors(expr_ref const& e);
 
+// Returns not(term), optimizing the case that term is true, false or not(e).
 expr_ref mk_not(expr_ref const& term);
+
+// Returns or(terms), optimizing the case that terms has 0 or 1 elements.
 expr_ref mk_disj(expr_ref_vector const& terms);
+
+// Returns and(terms), optimizing the case that terms has 0 or 1 elements.
 expr_ref mk_conj(expr_ref_vector const& terms);
+
+// Returns add(terms), optimizing the case that terms has 0 or 1 elements.
 expr_ref mk_sum(expr_ref_vector const& terms);
+
+// Returns mul(terms), optimizing the case that terms has 0 or 1 elements.
 expr_ref mk_prod(expr_ref_vector const& terms);
 
-expr* replace_pred(expr_ref_vector const& args, var_ref_vector const& vars, expr* e);
+// Returns e with each member of vars replaced by the corresponding member of args.
+expr_ref replace_args(expr_ref const& e, var_ref_vector const& vars, expr_ref_vector const& args);
 
-expr_ref_vector get_all_vars(expr_ref const& fml);
+// Returns a list of the variables and uninterpreted constants that appear in e.
+expr_ref_vector get_all_vars(expr_ref const& e);
 
+// Returns the list of arguments of the application as an expr_ref_vector.
 expr_ref_vector get_args_vector(app* a, ast_manager& m);
 
-expr_ref_vector get_arg_fresh_consts(func_decl* fdecl, char const* prefix, ast_manager& m);
+// Returns a list of variables of the correct types to be arguments to fdecl.
 var_ref_vector get_arg_vars(func_decl* fdecl, ast_manager& m);
 
+// Returns a list of fresh constants of the correct types to be arguments to fdecl.
+expr_ref_vector get_arg_fresh_consts(func_decl* fdecl, char const* prefix, ast_manager& m);
+
+// Returns exprs with the index of all variables increased by n.
 expr_ref_vector shift(expr_ref_vector const& exprs, unsigned n);
-var_ref_vector shift(var_ref_vector const& exprs, unsigned n);
+
+// Returns vars with the index of all variables increased by n.
+var_ref_vector shift(var_ref_vector const& vars, unsigned n);
+
+// Returns e with the index of all variables decreased by n.
 expr_ref inv_shift(expr_ref const& e, unsigned n);
+
+// Returns exprs with the index of all variables decreased by n.
 expr_ref_vector inv_shift(expr_ref_vector const& exprs, unsigned n);
 
-void quantifier_elimination(expr_ref_vector const& vars, expr_ref& fml);
+// Uses qe_lite to attempt to eliminate from e all uninterpreted constants
+// other than those in vars.
+void quantifier_elimination(expr_ref_vector const& vars, expr_ref& e);
 
+// Returns fml converted to Negation Normal Form (NNF), as well as with
+// negation of integer (in)equalities eliminated.
 expr_ref to_nnf(expr_ref const& fml);
+
+// Returns fml converted to Disjunctive Normal Form (DNF), as well as with
+// negation of integer (in)equalities eliminated.
 expr_ref to_dnf(expr_ref const& fml);
 
+// Returns the set of variables used by r.
 used_vars get_used_vars(datalog::rule const* r);
 
 #endif /* _PREDABST_UTIL_H */

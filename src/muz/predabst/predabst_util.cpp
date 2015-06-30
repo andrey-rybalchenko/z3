@@ -18,8 +18,6 @@ Revision History:
 --*/
 #include "predabst_util.h"
 #include "arith_decl_plugin.h"
-#include "smt_kernel.h"
-#include "smt_params.h"
 #include "qe_lite.h"
 #include "rewriter.h"
 
@@ -124,14 +122,15 @@ expr_ref_vector get_multiplicative_factors(expr_ref const& e) {
 expr_ref mk_not(expr_ref const& term) {
     ast_manager& m = term.m();
     CASSERT("predabst", sort_is_bool(term, m));
+	expr* e;
     if (m.is_true(term)) {
         return expr_ref(m.mk_false(), m);
     }
     else if (m.is_false(term)) {
         return expr_ref(m.mk_true(), m);
     }
-    else if (m.is_not(term)) {
-        return expr_ref(to_app(term)->get_arg(0), m);
+    else if (m.is_not(term, e)) {
+        return expr_ref(e, m);
     }
     else {
         return expr_ref(m.mk_not(term), m);
@@ -204,15 +203,14 @@ expr_ref mk_prod(expr_ref_vector const& terms) {
     }
 }
 
-expr* replace_pred(expr_ref_vector const& args, var_ref_vector const& vars, expr* e) {
-    ast_manager& m = args.m();
-    arith_util arith(m);
+expr_ref replace_args(expr_ref const& e, var_ref_vector const& vars, expr_ref_vector const& args) {
+    ast_manager& m = e.m();
     CASSERT("predabst", args.size() == vars.size());
     CASSERT("predabst", is_app(e));
     if (to_app(e)->get_num_args() == 0) {
         for (unsigned i = 0; i < args.size(); ++i) {
             if (args.get(i) == e) {
-                return vars.get(i);
+                return expr_ref(vars.get(i), m);
             }
         }
         return e;
@@ -220,29 +218,28 @@ expr* replace_pred(expr_ref_vector const& args, var_ref_vector const& vars, expr
     else {
         expr_ref_vector es(m);
         for (unsigned i = 0; i < to_app(e)->get_num_args(); ++i) {
-            es.push_back(replace_pred(args, vars, to_app(e)->get_arg(i)));
+			es.push_back(replace_args(expr_ref(to_app(e)->get_arg(i), m), vars, args));
         }
-        return m.mk_app(to_app(e)->get_decl(), es.size(), es.c_ptr());
+        return expr_ref(m.mk_app(to_app(e)->get_decl(), es.size(), es.c_ptr()), m);
     }
 }
 
-expr_ref_vector get_all_vars(expr_ref const& fml) {
-    ast_manager& m = fml.m();
-    arith_util arith(m);
+expr_ref_vector get_all_vars(expr_ref const& e) {
+    ast_manager& m = e.m();
     expr_ref_vector vars(m);
     expr_ref_vector todo(m);
-    todo.push_back(fml);
+    todo.push_back(e);
     while (!todo.empty()) {
-        expr* e = todo.back();
+        expr* e2 = todo.back();
         todo.pop_back();
-        if (is_var(e) || is_uninterp_const(e)) {
-            if (!vars.contains(e)) {
-                vars.push_back(e);
+        if (is_var(e2) || is_uninterp_const(e2)) {
+            if (!vars.contains(e2)) {
+                vars.push_back(e2);
             }
         }
         else {
-            CASSERT("predabst", is_app(e));
-            todo.append(to_app(e)->get_num_args(), to_app(e)->get_args());
+            CASSERT("predabst", is_app(e2));
+            todo.append(to_app(e2)->get_num_args(), to_app(e2)->get_args());
         }
     }
     return vars;
@@ -252,17 +249,6 @@ expr_ref_vector get_args_vector(app* a, ast_manager& m) {
     return expr_ref_vector(m, a->get_num_args(), a->get_args());
 }
 
-// Returns a vector of fresh constants of the right type to be arguments to fdecl.
-expr_ref_vector get_arg_fresh_consts(func_decl* fdecl, char const* prefix, ast_manager& m) {
-    expr_ref_vector args(m);
-    args.reserve(fdecl->get_arity());
-    for (unsigned i = 0; i < fdecl->get_arity(); ++i) {
-        args[i] = m.mk_fresh_const(prefix, fdecl->get_domain(i));
-    }
-    return args;
-}
-
-// Returns a vector of variables of the right type to be arguments to fdecl.
 var_ref_vector get_arg_vars(func_decl* fdecl, ast_manager& m) {
     var_ref_vector args(m);
     args.reserve(fdecl->get_arity());
@@ -270,6 +256,15 @@ var_ref_vector get_arg_vars(func_decl* fdecl, ast_manager& m) {
         args[i] = m.mk_var(i, fdecl->get_domain(i));
     }
     return args;
+}
+
+expr_ref_vector get_arg_fresh_consts(func_decl* fdecl, char const* prefix, ast_manager& m) {
+	expr_ref_vector args(m);
+	args.reserve(fdecl->get_arity());
+	for (unsigned i = 0; i < fdecl->get_arity(); ++i) {
+		args[i] = m.mk_fresh_const(prefix, fdecl->get_domain(i));
+	}
+	return args;
 }
 
 expr_ref_vector shift(expr_ref_vector const& exprs, unsigned n) {
@@ -285,17 +280,17 @@ expr_ref_vector shift(expr_ref_vector const& exprs, unsigned n) {
     return exprs2;
 }
 
-var_ref_vector shift(var_ref_vector const& exprs, unsigned n) {
-    ast_manager& m = exprs.m();
-    var_ref_vector exprs2(m);
+var_ref_vector shift(var_ref_vector const& vars, unsigned n) {
+    ast_manager& m = vars.m();
+    var_ref_vector vars2(m);
     var_shifter shift(m);
-    for (unsigned i = 0; i < exprs.size(); ++i) {
-        expr_ref e(exprs.get(i), m);
+    for (unsigned i = 0; i < vars.size(); ++i) {
+		expr_ref e(vars.get(i), m);
         expr_ref e2(m);
         shift(e, n, e2);
-        exprs2.push_back(to_var(e2.get()));
+        vars2.push_back(to_var(e2.get()));
     }
-    return exprs2;
+	return vars2;
 }
 
 expr_ref inv_shift(expr_ref const& e, unsigned n) {
@@ -319,26 +314,26 @@ expr_ref_vector inv_shift(expr_ref_vector const& exprs, unsigned n) {
     return exprs2;
 }
 
-void quantifier_elimination(expr_ref_vector const& vars, expr_ref& fml) {
-    ast_manager& m = fml.get_manager();
+void quantifier_elimination(expr_ref_vector const& vars, expr_ref& e) {
+    ast_manager& m = e.get_manager();
     app_ref_vector q_vars(m);
-    expr_ref_vector all_vars = get_all_vars(fml);
+    expr_ref_vector all_vars = get_all_vars(e);
     for (unsigned i = 0; i < all_vars.size(); ++i) {
         if (!vars.contains(all_vars.get(i))) {
             q_vars.push_back(to_app(all_vars.get(i)));
         }
     }
-    STRACE("predabst", tout << "Eliminating existentials " << q_vars << " from " << fml << " in variables " << vars << " ...\n";);
+    STRACE("predabst", tout << "Eliminating existentials " << q_vars << " from " << e << " in variables " << vars << " ...\n";);
     qe_lite ql(m);
-    ql(q_vars, fml);
-    STRACE("predabst", tout << "... produces " << fml << "\n";);
+    ql(q_vars, e);
+    STRACE("predabst", tout << "... produces " << e << "\n";);
     if (!q_vars.empty()) {
         STRACE("predabst", tout << "Note: failed to eliminate " << q_vars << "\n";);
     }
 }
 
 static bool is_distinct(ast_manager& m, expr const* n, expr*& s, expr*& t) {
-    if (m.is_distinct(n) && to_app(n)->get_num_args() == 2) {
+    if (m.is_distinct(n) && (to_app(n)->get_num_args() == 2)) {
         s = to_app(n)->get_arg(0);
         t = to_app(n)->get_arg(1);
         return true;

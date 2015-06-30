@@ -550,7 +550,7 @@ namespace datalog {
                 CASSERT("predabst", solution.m_head.m_name < name2func_decl.size());
                 symbol_info* si = name2func_decl[solution.m_head.m_name];
                 CASSERT("predabst", si);
-                expr_ref pred(replace_pred(solution.m_head.m_args, si->m_abstracted_vars, solution.m_body), m);
+				expr_ref pred = replace_args(solution.m_body, si->m_abstracted_vars, solution.m_head.m_args);
                 new_preds_added += maybe_add_pred(si, pred);
             }
             return (new_preds_added > 0);
