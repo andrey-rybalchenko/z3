@@ -598,6 +598,11 @@ namespace datalog {
             break;
         case DDNF_ENGINE:
             break;
+        case PREDABST_ENGINE:
+            m_rule_properties.collect(r);
+            m_rule_properties.check_existential_tail();
+            m_rule_properties.check_for_negated_predicates();
+			break;
         case LAST_ENGINE:
         default:
             UNREACHABLE();
@@ -825,6 +830,9 @@ namespace datalog {
         else if (e == symbol("ddnf")) {
             m_engine_type = DDNF_ENGINE;
         }
+        else if (e == symbol("predabst")) {
+            m_engine_type = PREDABST_ENGINE;
+        }
 
         if (m_engine_type == LAST_ENGINE) {
             expr_fast_mark1 mark;
@@ -862,6 +870,7 @@ namespace datalog {
         case TAB_ENGINE:
         case CLP_ENGINE:
         case DDNF_ENGINE:
+        case PREDABST_ENGINE:
             flush_add_rules();
             break;
         case DUALITY_ENGINE:

@@ -32,6 +32,7 @@ namespace datalog {
         CLP_ENGINE,
 	DUALITY_ENGINE,
         DDNF_ENGINE,
+        PREDABST_ENGINE,
         LAST_ENGINE
     };
 

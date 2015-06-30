@@ -24,6 +24,7 @@ Revision History:
 #include "pdr_dl_interface.h"
 #include "ddnf.h"
 #include "duality_dl_interface.h"
+#include "predabst_context.h"
 
 namespace datalog {
     register_engine::register_engine(): m_ctx(0) {}
@@ -46,6 +47,8 @@ namespace datalog {
             return alloc(Duality::dl_interface, *m_ctx);
         case DDNF_ENGINE:
             return alloc(ddnf, *m_ctx);
+        case PREDABST_ENGINE:
+            return alloc(predabst, *m_ctx);
         case LAST_ENGINE:
             UNREACHABLE();
             return 0;
