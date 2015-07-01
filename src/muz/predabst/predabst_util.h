@@ -23,6 +23,7 @@ Revision History:
 #include "ast_pp.h"
 #include "used_vars.h"
 #include "dl_rule.h"
+#include "var_subst.h"
 
 // Returns true if v1 and v2 are equal.
 template<typename V>
@@ -210,5 +211,73 @@ expr_ref to_dnf(expr_ref const& fml);
 
 // Returns the set of variables used by r.
 used_vars get_used_vars(datalog::rule const* r);
+
+class subst_util {
+	ast_manager& m;
+	var_subst    m_var_subst;
+
+public:
+	subst_util(ast_manager& m) :
+		m(m),
+		m_var_subst(m, false) {
+	}
+
+	// Apply a substitution vector to an expression, returning the result.
+	expr_ref apply(expr* expr, expr_ref_vector const& subst) {
+		expr_ref expr2(m);
+		m_var_subst(expr, subst.size(), subst.c_ptr(), expr2);
+		return expr2;
+	}
+
+	// Apply a substitution vector to an application expression, returning the result.
+	app_ref apply(app* app, expr_ref_vector const& subst) {
+		expr_ref expr2(m);
+		m_var_subst(app, subst.size(), subst.c_ptr(), expr2);
+		return app_ref(to_app(expr2), m);
+	}
+
+	// Apply a substitution vector to each expression in a vector of
+	// expressions, returning the result.
+	expr_ref_vector apply(expr_ref_vector const& exprs, expr_ref_vector const& subst) {
+		expr_ref_vector exprs2(m);
+		exprs2.reserve(exprs.size());
+		for (unsigned i = 0; i < exprs.size(); ++i) {
+			exprs2[i] = apply(exprs[i], subst);
+		}
+		return exprs2;
+	}
+
+	// Returns a substitution vector that maps each variable in vars to the
+	// corresponding expression in exprs.
+	expr_ref_vector build(unsigned n, var* const* vars, expr* const* exprs) {
+		expr_ref_vector inst(m);
+		inst.reserve(n); // note that this is not necessarily the final size of inst
+		for (unsigned i = 0; i < n; ++i) {
+			unsigned idx = vars[i]->get_idx();
+			inst.reserve(idx + 1);
+			CASSERT("predabst", !inst.get(idx));
+			inst[idx] = exprs[i];
+		}
+		return inst;
+	}
+
+	expr_ref_vector build(var* const* vars, expr_ref_vector const& exprs) {
+		return build(exprs.size(), vars, exprs.c_ptr());
+	}
+
+	expr_ref_vector build(var_ref_vector const& vars, expr* const* exprs) {
+		return build(vars.size(), vars.c_ptr(), exprs);
+	}
+
+	expr_ref_vector build(var_ref_vector const& vars, expr_ref_vector const& exprs) {
+		CASSERT("predabst", vars.size() == exprs.size());
+		return build(vars.size(), vars.c_ptr(), exprs.c_ptr());
+	}
+
+	expr_ref_vector build(var_ref_vector const& vars, var_ref_vector const& exprs) {
+		CASSERT("predabst", vars.size() == exprs.size());
+		return build(vars.size(), vars.c_ptr(), (expr* const*)exprs.c_ptr());
+	}
+};
 
 #endif /* _PREDABST_UTIL_H */

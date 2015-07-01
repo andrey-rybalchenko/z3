@@ -16,10 +16,10 @@ Author:
 Revision History:
 
 --*/
+#include "predabst_core.h"
 #include "predabst_util.h"
 #include "farkas_util.h"
 #include "predabst_context.h"
-#include "predabst_core.h"
 #include "uint_set.h"
 #include "model_evaluator.h"
 #include "smt_params.h"

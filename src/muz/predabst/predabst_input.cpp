@@ -16,9 +16,9 @@ Author:
 Revision History:
 
 --*/
+#include "predabst_input.h"
 #include "predabst_util.h"
 #include "predabst_rule.h"
-#include "predabst_input.h"
 #include "dl_rule_set.h"
 #include "fixedpoint_params.hpp"
 
@@ -157,7 +157,10 @@ namespace datalog {
                 }
             }
 
+			m_stats.m_num_symbols = m_input->m_symbols.size();
+			m_stats.m_num_templates = m_input->m_templates.size();
             m_stats.m_num_rules = m_input->m_rules.size();
+			m_stats.m_num_template_params = m_input->m_template_vars.size();
 
             STRACE("predabst", print_initial_state(tout););
         }
@@ -295,8 +298,6 @@ namespace datalog {
 
                 m_input->m_symbols.push_back(alloc(symbol_info, fdecl, is_dwf, m));
                 m_func_decl2symbol.insert(fdecl, m_input->m_symbols.back());
-                m_stats.m_num_predicate_symbols++;
-                m_stats.m_num_predicate_symbol_arguments += fdecl->get_arity();
             }
         }
 
@@ -358,7 +359,6 @@ namespace datalog {
             m_input->m_template_vars.swap(extra_vars);
             CASSERT("predabst", !m_input->m_template_extras);
             m_input->m_template_extras = extras;
-            m_stats.m_num_template_params = m_input->m_template_vars.size();
         }
 
         static bool is_template(func_decl const* fdecl) {
@@ -426,7 +426,6 @@ namespace datalog {
 
             m_input->m_templates.push_back(alloc(template_info, suffix_decl, vars, body));
             m_func_decl2template.insert(suffix_decl, m_input->m_templates.back());
-            m_stats.m_num_templates++;
 
             m_input->m_symbols.erase(si);
             m_func_decl2symbol.remove(suffix_decl);

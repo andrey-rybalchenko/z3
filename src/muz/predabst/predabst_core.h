@@ -57,9 +57,6 @@ namespace datalog {
 
     public:
         struct stats {
-            stats() { reset(); }
-            void reset() { memset(this, 0, sizeof(*this)); }
-
             // Statistics about rule pre-processing.
             unsigned m_num_head_predicates;
             unsigned m_num_body_predicates;
@@ -84,7 +81,10 @@ namespace datalog {
             unsigned m_num_head_evals;
             unsigned m_num_well_founded_nodes;
 
-            void update(statistics& st) {
+			stats() { reset(); }
+			void reset() { memset(this, 0, sizeof(*this)); }
+
+			void update(statistics& st) {
 #define UPDATE_STAT(NAME) st.update(#NAME, m_ ## NAME)
                 UPDATE_STAT(num_head_predicates);
                 UPDATE_STAT(num_body_predicates);

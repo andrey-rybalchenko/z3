@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#include "predabst_util.h"
 #include "predabst_rule.h"
+#include "predabst_util.h"
 
 namespace datalog {
     expr_ref_vector rule_info::get_abstracted_args() const {
@@ -35,7 +35,22 @@ namespace datalog {
         }
     }
 
-    expr_ref_vector rule_info::get_abstracted_args(unsigned i) const {
+	expr_ref_vector rule_info::get_explicit_args() const {
+		if (get_decl()) {
+			expr_ref_vector args(m);
+			for (unsigned i = 0; i < get_decl()->m_arg_kinds.size(); ++i) {
+				if (get_decl()->m_arg_kinds[i] == symbol_info::explicit_arg) {
+					args.push_back(get_head()->get_arg(i));
+				}
+			}
+			return args;
+		}
+		else {
+			return expr_ref_vector(m);
+		}
+	}
+
+	expr_ref_vector rule_info::get_abstracted_args(unsigned i) const {
         CASSERT("predabst", get_decl(i));
         expr_ref_vector args(m);
         for (unsigned j = 0; j < get_decl(i)->m_arg_kinds.size(); ++j) {
@@ -44,21 +59,6 @@ namespace datalog {
             }
         }
         return args;
-    }
-
-    expr_ref_vector rule_info::get_explicit_args() const {
-        if (get_decl()) {
-            expr_ref_vector args(m);
-            for (unsigned i = 0; i < get_decl()->m_arg_kinds.size(); ++i) {
-                if (get_decl()->m_arg_kinds[i] == symbol_info::explicit_arg) {
-                    args.push_back(get_head()->get_arg(i));
-                }
-            }
-            return args;
-        }
-        else {
-            return expr_ref_vector(m);
-        }
     }
 
     expr_ref_vector rule_info::get_explicit_args(unsigned i) const {
@@ -71,6 +71,10 @@ namespace datalog {
         }
         return args;
     }
+
+	expr_ref_vector rule_info::get_body(expr_ref_vector const& template_params, subst_util& subst) const {
+		return inv_shift(subst.apply(m_body, template_params), template_params.size());
+	}
 
     used_vars rule_info::get_used_vars() const {
         return ::get_used_vars(m_rule);

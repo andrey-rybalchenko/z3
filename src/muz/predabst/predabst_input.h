@@ -19,16 +19,17 @@ Revision History:
 #ifndef _PREDABST_INPUT_H_
 #define _PREDABST_INPUT_H_
 
+#include "predabst_rule.h"
 #include "ast.h"
 #include "fixedpoint_params.hpp"
 
 namespace datalog {
     struct predabst_input {
-        vector<symbol_info*>                m_symbols;
-        vector<template_info*>              m_templates;
-        vector<rule_info*>                  m_rules;
-        var_ref_vector                      m_template_vars;
-        expr_ref                            m_template_extras;
+        vector<symbol_info*>   m_symbols;
+        vector<template_info*> m_templates;
+        vector<rule_info*>     m_rules;
+        var_ref_vector         m_template_vars;
+        expr_ref               m_template_extras;
 
         predabst_input(ast_manager& m) :
             m_template_vars(m), 
@@ -48,29 +49,27 @@ namespace datalog {
         }
 
         struct stats {
-            stats() { reset(); }
-            void reset() { memset(this, 0, sizeof(*this)); }
-
-            unsigned m_num_predicate_symbols;
-            unsigned m_num_predicate_symbol_arguments;
-            unsigned m_num_explicit_arguments;
+            unsigned m_num_symbols;
+			unsigned m_num_templates;
+			unsigned m_num_rules;
+			unsigned m_num_template_params;
+			unsigned m_num_explicit_arguments;
             unsigned m_num_named_arguments;
-            unsigned m_num_template_params;
-            unsigned m_num_templates;
-            unsigned m_num_initial_predicates;
-            unsigned m_num_rules;
+			unsigned m_num_initial_predicates;
 
-            void update(statistics& st) {
+			stats() { reset(); }
+			void reset() { memset(this, 0, sizeof(*this)); }
+
+			void update(statistics& st) {
 #define UPDATE_STAT(NAME) st.update(#NAME, m_ ## NAME)
-                UPDATE_STAT(num_predicate_symbols);
-                UPDATE_STAT(num_predicate_symbol_arguments);
-                UPDATE_STAT(num_explicit_arguments);
+                UPDATE_STAT(num_symbols);
+				UPDATE_STAT(num_templates);
+				UPDATE_STAT(num_rules);
+				UPDATE_STAT(num_template_params);
+				UPDATE_STAT(num_explicit_arguments);
                 UPDATE_STAT(num_named_arguments);
-                UPDATE_STAT(num_template_params);
-                UPDATE_STAT(num_templates);
-                UPDATE_STAT(num_initial_predicates);
-                UPDATE_STAT(num_rules);
-            }
+				UPDATE_STAT(num_initial_predicates);
+			}
         };
     };
 

@@ -16,12 +16,12 @@ Author:
 Revision History:
 
 --*/
+#include "predabst_context.h"
 #include "predabst_util.h"
 #include "farkas_util.h"
 #include "predabst_rule.h"
 #include "predabst_input.h"
 #include "predabst_core.h"
-#include "predabst_context.h"
 #include "dl_context.h"
 #include "unifier.h"
 #include "reg_decl_plugins.h"
@@ -80,9 +80,6 @@ namespace datalog {
 
     class predabst::imp {
         struct stats : private predabst_core::stats, private predabst_input::stats {
-            stats() { reset(); }
-            void reset() { memset(this, 0, sizeof(*this)); }
-
             // Overall statistics.
             unsigned m_num_refinement_iterations;
             unsigned m_num_template_instantiations;
@@ -90,6 +87,9 @@ namespace datalog {
             // Statistics about refinement.
             unsigned m_num_predicates_added;
             unsigned m_num_predicates_added_query_naming;
+
+			stats() { reset(); }
+			void reset() { memset(this, 0, sizeof(*this)); }
 
             void update(statistics& st) {
                 predabst_core::stats::update(st);
