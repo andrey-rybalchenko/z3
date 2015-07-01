@@ -24,7 +24,18 @@ Revision History:
 #include "fixedpoint_params.hpp"
 
 namespace predabst {
-    typedef vector<bool> cube_t;
+    struct cube_t {
+        expr_ref_vector const m_values;
+        vector<bool>    const m_cube;
+        cube_t(expr_ref_vector const& values, vector<bool> const& cube) :
+            m_values(values),
+            m_cube(cube) {
+        }
+        friend std::ostream& operator<<(std::ostream& out, cube_t const& cube) {
+            out << "(" << cube.m_values << ")-[" << cube.m_cube << "]";
+            return out;
+        }
+    };
 
     struct node_info;
     typedef vector<node_info const*> node_vector;
@@ -33,14 +44,12 @@ namespace predabst {
         unsigned           const m_id;
         symbol_info const* const m_symbol;
         cube_t             const m_cube;
-        expr_ref_vector    const m_values;
         rule_info const*   const m_parent_rule;
         node_vector        const m_parent_nodes;
-        node_info(unsigned id, symbol_info const* symbol, cube_t const& cube, expr_ref_vector const& values, rule_info const* parent_rule, node_vector const& parent_nodes) :
+        node_info(unsigned id, symbol_info const* symbol, cube_t const& cube, rule_info const* parent_rule, node_vector const& parent_nodes) :
             m_id(id),
             m_symbol(symbol),
             m_cube(cube),
-            m_values(values),
             m_parent_rule(parent_rule),
             m_parent_nodes(parent_nodes) {}
         friend std::ostream& operator<<(std::ostream& out, node_info const* node) {
@@ -81,10 +90,10 @@ namespace predabst {
             unsigned m_num_head_evals;
             unsigned m_num_well_founded_nodes;
 
-			stats() { reset(); }
-			void reset() { memset(this, 0, sizeof(*this)); }
+            stats() { reset(); }
+            void reset() { memset(this, 0, sizeof(*this)); }
 
-			void update(statistics& st) {
+            void update(statistics& st) {
 #define UPDATE_STAT(NAME) st.update(#NAME, m_ ## NAME)
                 UPDATE_STAT(num_head_predicates);
                 UPDATE_STAT(num_body_predicates);

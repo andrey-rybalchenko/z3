@@ -250,10 +250,14 @@ namespace predabst {
         // Returns whether c1 implies c2, or in other words, whether the set
         // represented by c1 is a (non-strict) subset of that represented by c2.
         static bool cube_leq(cube_t const& c1, cube_t const& c2) {
-            CASSERT("predabst", c1.size() == c2.size());
-            unsigned size = c1.size();
+            CASSERT("predabst", c1.m_values.size() == c2.m_values.size());
+            if (!vector_equals(c1.m_values, c2.m_values)) {
+                return false;
+            }
+            CASSERT("predabst", c1.m_cube.size() == c2.m_cube.size());
+            unsigned size = c1.m_cube.size();
             for (unsigned i = 0; i < size; ++i) {
-                if (c2[i] && !c1[i]) {
+                if (c2.m_cube[i] && !c1.m_cube[i]) {
                     return false;
                 }
             }
@@ -264,7 +268,7 @@ namespace predabst {
             return true;
         }
 
-        expr_ref cube_to_formula(cube_t const& cube, expr_ref_vector const& preds) const {
+        expr_ref cube_to_formula(vector<bool> const& cube, expr_ref_vector const& preds) const {
             expr_ref_vector es(m);
             CASSERT("predabst", cube.size() == preds.size());
             for (unsigned i = 0; i < cube.size(); ++i) {
@@ -623,28 +627,28 @@ namespace predabst {
 
                     bool skip = false;
                     cube_t const& cube = node->m_cube;
-                    expr_ref_vector const& body_preds = info->m_body_preds[i];
-                    unsigned num_preds = body_preds.size();
-                    CASSERT("predabst", num_preds == cube.size());
-                    for (unsigned j = 0; j < num_preds; ++j) {
-                        if (cube[j]) {
-                            if (m_fp_params.predabst_skip_false_body_preds() && m.is_false(body_preds[j])) {
-                                // Skip parent nodes that are trivially inconsistent with this rule.
-                                skip = true;
-                                break;
-                            }
+                    expr_ref_vector const& body_args = info->m_body_explicit_args[i];
+                    unsigned num_values = body_args.size();
+                    CASSERT("predabst", num_values == cube.m_values.size());
+                    vector<bool> const& known_args = info->m_body_known_args[i];
+                    for (unsigned j = 0; j < num_values; ++j) {
+                        if (m_fp_params.predabst_skip_incorrect_body_values() && known_args[j] && (body_args.get(j) != cube.m_values.get(j))) {
+                            // Skip parent nodes that are trivially inconsistent with this application.
+                            skip = true;
+                            break;
                         }
                     }
                     if (!skip) {
-                        expr_ref_vector const& values = node->m_values;
-                        expr_ref_vector const& body_args = info->m_body_explicit_args[i];
-                        vector<bool> const& known_args = info->m_body_known_args[i];
-                        CASSERT("predabst", values.size() == body_args.size());
-                        for (unsigned j = 0; j < values.size(); ++j) {
-                            if (m_fp_params.predabst_skip_incorrect_body_values() && known_args.get(j) && (body_args.get(j) != values.get(j))) {
-                                // Skip parent nodes that are trivially inconsistent with this application.
-                                skip = true;
-                                break;
+                        expr_ref_vector const& body_preds = info->m_body_preds[i];
+                        unsigned num_preds = body_preds.size();
+                        CASSERT("predabst", num_preds == cube.m_cube.size());
+                        for (unsigned j = 0; j < num_preds; ++j) {
+                            if (cube.m_cube[j]) {
+                                if (m_fp_params.predabst_skip_false_body_preds() && m.is_false(body_preds[j])) {
+                                    // Skip parent nodes that are trivially inconsistent with this rule.
+                                    skip = true;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -672,28 +676,28 @@ namespace predabst {
                     node_info const* node = *it;
                     expr_ref_vector pos_cube(m);
                     cube_t const& cube = node->m_cube;
+                    expr_ref_vector const& body_args = info->m_body_explicit_args[i];
+                    unsigned num_values = body_args.size();
+                    CASSERT("predabst", num_values == cube.m_values.size());
+                    vector<bool> const& known_args = info->m_body_known_args[i];
+                    for (unsigned j = 0; j < num_values; ++j) {
+                        CASSERT("predabst", !(m_fp_params.predabst_skip_incorrect_body_values() && known_args[j] && (body_args.get(j) != cube.m_values.get(j))));
+                        if (m_fp_params.predabst_skip_correct_body_values() && (body_args.get(j) == cube.m_values.get(j))) {
+                            continue;
+                        }
+                        pos_cube.push_back(m.mk_eq(body_args.get(j), cube.m_values.get(j)));
+                    }
                     expr_ref_vector const& body_preds = info->m_body_preds[i];
                     unsigned num_preds = body_preds.size();
-                    CASSERT("predabst", num_preds == cube.size());
+                    CASSERT("predabst", num_preds == cube.m_cube.size());
                     for (unsigned j = 0; j < num_preds; ++j) {
-                        if (cube[j]) {
+                        if (cube.m_cube[j]) {
                             CASSERT("predabst", !(m_fp_params.predabst_skip_false_body_preds() && m.is_false(body_preds[j])));
                             if (m_fp_params.predabst_skip_true_body_preds() && m.is_true(body_preds[j])) {
                                 continue;
                             }
                             pos_cube.push_back(body_preds[j]);
                         }
-                    }
-                    expr_ref_vector const& values = node->m_values;
-                    expr_ref_vector const& body_args = info->m_body_explicit_args[i];
-                    vector<bool> const& known_args = info->m_body_known_args[i];
-                    CASSERT("predabst", values.size() == body_args.size());
-                    for (unsigned j = 0; j < values.size(); ++j) {
-                        CASSERT("predabst", !(m_fp_params.predabst_skip_incorrect_body_values() && known_args.get(j) && (body_args.get(j) != values.get(j))));
-                        if (m_fp_params.predabst_skip_correct_body_values() && (body_args.get(j) == values.get(j))) {
-                            continue;
-                        }
-                        pos_cube.push_back(m.mk_eq(body_args.get(j), values.get(j)));
                     }
                     pos_cubes.push_back(pos_cube);
                 }
@@ -973,11 +977,10 @@ namespace predabst {
 
                 // collect abstract cube and explicit values
                 cube_t cube = cart_pred_abst_cube(ri, head_es, assumptions);
-                expr_ref_vector values = cart_pred_abst_values(ri, assumptions);
-                STRACE("predabst", tout << "Applying rule " << ri << " to nodes ("; reorder_output_nodes(tout, chosen_nodes, positions); tout << ") gives cube [" << cube << "] and values (" << values << ")\n";);
+                STRACE("predabst", tout << "Applying rule " << ri << " to nodes ("; reorder_output_nodes(tout, chosen_nodes, positions); tout << ") gives cube " << cube << "\n";);
 
                 // add and check the node
-                node_info const* node = add_node(ri, cube, values, reorder_nodes(chosen_nodes, positions));
+                node_info const* node = add_node(ri, cube, reorder_nodes(chosen_nodes, positions));
                 if (node) {
                     check_node_property(node);
                 }
@@ -986,46 +989,7 @@ namespace predabst {
 
         cube_t cart_pred_abst_cube(rule_info const* ri, expr_ref_vector const& es, expr_ref_vector& assumptions) {
             rule_instance_info const* info = m_rule_instances[ri];
-            unsigned num_preds = es.size();
-            CASSERT("predabst", (!ri->get_decl() && (num_preds == 0)) || (num_preds == ri->get_decl()->m_preds.size()));
-            cube_t cube;
-            cube.resize(num_preds);
-            for (unsigned i = 0; i < num_preds; ++i) {
-                if (m_fp_params.predabst_skip_false_head_preds() && m.is_false(es.get(i))) {
-                    cube[i] = true;
-                }
-                else if (m_fp_params.predabst_skip_true_head_preds() && m.is_true(es.get(i))) {
-                    cube[i] = false;
-                }
-                else {
-                    if (m_fp_params.predabst_use_head_assumptions()) {
-                        assumptions.push_back(es.get(i));
-                    }
-                    else {
-                        solver_for(ri)->push();
-                        solver_for(ri)->assert_expr(es.get(i));
-                    }
-                    lbool result = check(solver_for(ri), assumptions.size(), assumptions.c_ptr());
-                    cube[i] = (result == l_false);
-                    if (result == l_false) {
-                        m_stats.m_num_head_checks_unsat++;
-                    }
-                    else {
-                        m_stats.m_num_head_checks_sat++;
-                    }
-                    if (m_fp_params.predabst_use_head_assumptions()) {
-                        assumptions.pop_back();
-                    }
-                    else {
-                        solver_for(ri)->pop(1);
-                    }
-                }
-            }
-            return cube;
-        }
 
-        expr_ref_vector cart_pred_abst_values(rule_info const* ri, expr_ref_vector const& assumptions) {
-            rule_instance_info const* info = m_rule_instances[ri];
             expr_ref_vector values(m);
             if (info->m_head_explicit_args.size() == 0) {
                 // nothing to do
@@ -1064,26 +1028,65 @@ namespace predabst {
                 }
             }
 #ifdef Z3DEBUG
-            // Check that these explicit values are uniquely determined.  This
-            // check may fail if some arguments were incorrectly marked as
-            // explicit.
-            scoped_push _push(*solver_for(ri));
-            expr_ref_vector es(m);
-            for (unsigned i = 0; i < info->m_head_explicit_args.size(); ++i) {
-                if (!info->m_head_known_args.get(i)) {
-                    es.push_back(m.mk_eq(info->m_head_explicit_args.get(i), values.get(i)));
+            {
+                // Check that these explicit values are uniquely determined.  This
+                // check may fail if some arguments were incorrectly marked as
+                // explicit.
+                scoped_push _push(*solver_for(ri));
+                expr_ref_vector exprs(m);
+                for (unsigned i = 0; i < info->m_head_explicit_args.size(); ++i) {
+                    if (!info->m_head_known_args.get(i)) {
+                        exprs.push_back(m.mk_eq(info->m_head_explicit_args.get(i), values.get(i)));
+                    }
+                }
+                expr_ref to_assert(m.mk_not(mk_conj(exprs)), m);
+                pre_simplify(to_assert);
+                solver_for(ri)->assert_expr(to_assert);
+                lbool result = check(solver_for(ri), assumptions.size(), assumptions.c_ptr());
+                if (result == l_true) {
+                    STRACE("predabst", tout << "Error: values of explicit arguments were not uniquely determined\n";);
+                    throw default_exception("values of explicit arguments for " + ri->get_decl()->m_fdecl->get_name().str() + " were not uniquely determined");
                 }
             }
-            expr_ref to_assert(m.mk_not(mk_conj(es)), m);
-            pre_simplify(to_assert);
-            solver_for(ri)->assert_expr(to_assert);
-            lbool result = check(solver_for(ri), assumptions.size(), assumptions.c_ptr());
-            if (result == l_true) {
-                STRACE("predabst", tout << "Error: values of explicit arguments were not uniquely determined\n";);
-                throw default_exception("values of explicit arguments for " + ri->get_decl()->m_fdecl->get_name().str() + " were not uniquely determined");
-            }
 #endif
-            return values;
+
+            unsigned num_preds = es.size();
+            CASSERT("predabst", (!ri->get_decl() && (num_preds == 0)) || (num_preds == ri->get_decl()->m_preds.size()));
+            vector<bool> cube;
+            cube.resize(num_preds);
+            for (unsigned i = 0; i < num_preds; ++i) {
+                if (m_fp_params.predabst_skip_false_head_preds() && m.is_false(es.get(i))) {
+                    cube[i] = true;
+                }
+                else if (m_fp_params.predabst_skip_true_head_preds() && m.is_true(es.get(i))) {
+                    cube[i] = false;
+                }
+                else {
+                    if (m_fp_params.predabst_use_head_assumptions()) {
+                        assumptions.push_back(es.get(i));
+                    }
+                    else {
+                        solver_for(ri)->push();
+                        solver_for(ri)->assert_expr(es.get(i));
+                    }
+                    lbool result = check(solver_for(ri), assumptions.size(), assumptions.c_ptr());
+                    cube[i] = (result == l_false);
+                    if (result == l_false) {
+                        m_stats.m_num_head_checks_unsat++;
+                    }
+                    else {
+                        m_stats.m_num_head_checks_sat++;
+                    }
+                    if (m_fp_params.predabst_use_head_assumptions()) {
+                        assumptions.pop_back();
+                    }
+                    else {
+                        solver_for(ri)->pop(1);
+                    }
+                }
+            }
+
+            return cube_t(values, cube);
         }
 
         void check_node_property(node_info const* node) {
@@ -1104,44 +1107,41 @@ namespace predabst {
             symbol_info const* si = node->m_symbol;
             CASSERT("predabst", si->m_is_dwf);
 
-            CASSERT("predabst", node->m_values.size() % 2 == 0);
-            unsigned n = node->m_values.size() / 2;
+            CASSERT("predabst", node->m_cube.m_values.size() % 2 == 0);
+            unsigned n = node->m_cube.m_values.size() / 2;
             for (unsigned i = 0; i < n; ++i) {
-                if (node->m_values[i] != node->m_values[i + n]) {
+                if (node->m_cube.m_values[i] != node->m_cube.m_values[i + n]) {
                     return true;
                 }
             }
 
-            expr_ref expr = cube_to_formula(node->m_cube, si->m_preds);
+            expr_ref expr = cube_to_formula(node->m_cube.m_cube, si->m_preds);
             expr_ref_vector args = si->get_fresh_abstracted_args("s");
             expr_ref to_rank = m_subst.apply(expr, m_subst.build(si->m_abstracted_vars, args));
 
             return well_founded(args, to_rank, NULL, NULL);
         }
 
-        node_info const* add_node(rule_info const* ri, cube_t const& cube, expr_ref_vector const& values, node_vector const& nodes = node_vector()) {
-            CASSERT("predabst", cube.size() == m_rule_instances[ri]->m_head_preds.size());
-            CASSERT("predabst", values.size() == m_rule_instances[ri]->m_head_explicit_args.size());
+        node_info const* add_node(rule_info const* ri, cube_t const& cube, node_vector const& nodes = node_vector()) {
+            CASSERT("predabst", cube.m_cube.size() == m_rule_instances[ri]->m_head_preds.size());
+            CASSERT("predabst", cube.m_values.size() == m_rule_instances[ri]->m_head_explicit_args.size());
             m_stats.m_num_nodes_discovered++;
             symbol_info const* si = ri->get_decl();
             if (si) {
                 // first fixpoint check combined with maximality maintainance
                 node_vector old_lt_nodes;
                 for (node_vector::const_iterator it = m_max_reach_nodes[si].begin(); it != m_max_reach_nodes[si].end(); ++it) {
-                    if (!vector_equals(values, (*it)->m_values)) {
-                        continue;
-                    }
                     cube_t const& old_cube = (*it)->m_cube;
                     // if cube implies existing cube then nothing to add
                     if (cube_leq(cube, old_cube)) {
-                        STRACE("predabst", tout << "New node is subsumed by node " << *it << " with cube [" << old_cube << "]\n";);
+                        STRACE("predabst", tout << "New node is subsumed by node " << *it << " with cube " << old_cube << "\n";);
                         CASSERT("predabst", old_lt_nodes.empty());
                         m_stats.m_num_nodes_suppressed++;
                         return NULL;
                     }
                     // stronger old cubes will not be considered maximal
                     if (cube_leq(old_cube, cube)) {
-                        STRACE("predabst", tout << "New node subsumes node " << *it << " with cube [" << old_cube << "]\n";);
+                        STRACE("predabst", tout << "New node subsumes node " << *it << " with cube " << old_cube << "\n";);
                         old_lt_nodes.push_back(*it);
                     }
                 }
@@ -1157,7 +1157,7 @@ namespace predabst {
                 }
             }
             // no fixpoint reached hence create new node
-            m_nodes.push_back(alloc(node_info, m_nodes.size(), si, cube, values, ri, nodes));
+            m_nodes.push_back(alloc(node_info, m_nodes.size(), si, cube, ri, nodes));
             node_info const* node = m_nodes.back();
             if (si) {
                 m_max_reach_nodes[si].insert(node);
@@ -1171,17 +1171,16 @@ namespace predabst {
 
         expr_ref node_to_formula(node_info const* node) const {
             expr_ref_vector es(m);
-            expr_ref_vector const& values = node->m_values;
-            var_ref_vector const& args = node->m_symbol->m_explicit_vars;
-            CASSERT("predabst", values.size() == args.size());
-            for (unsigned i = 0; i < values.size(); ++i) {
-                es.push_back(m.mk_eq(args.get(i), values.get(i)));
-            }
             cube_t const& cube = node->m_cube;
+            var_ref_vector const& args = node->m_symbol->m_explicit_vars;
+            CASSERT("predabst", cube.m_values.size() == args.size());
+            for (unsigned i = 0; i < cube.m_values.size(); ++i) {
+                es.push_back(m.mk_eq(args.get(i), cube.m_values.get(i)));
+            }
             expr_ref_vector const& preds = node->m_symbol->m_preds;
-            CASSERT("predabst", cube.size() == preds.size());
-            for (unsigned i = 0; i < cube.size(); ++i) {
-                if (cube[i]) {
+            CASSERT("predabst", cube.m_cube.size() == preds.size());
+            for (unsigned i = 0; i < cube.m_cube.size(); ++i) {
+                if (cube.m_cube[i]) {
                     es.push_back(preds[i]);
                 }
             }
@@ -1216,9 +1215,8 @@ namespace predabst {
                 node_info const* node = m_nodes[i];
                 out << "    " << i << ": rule " << node->m_parent_rule
                     << " applied to nodes (" << node->m_parent_nodes
-                    << ") giving cube [" << node->m_cube
-                    << "] and values (" << node->m_values
-                    << ") for " << node->m_symbol
+                    << ") giving cube " << node->m_cube
+                    << " for " << node->m_symbol
                     << std::endl;
             }
             out << "  Max reached nodes:" << std::endl;

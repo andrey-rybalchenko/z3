@@ -776,11 +776,11 @@ namespace predabst {
                 rule_info const* ri = node->m_parent_rule;
 
                 if (count < last_count) {
-                    expr_ref_vector const& hvalues = node->m_values;
+                    expr_ref_vector const& hvalues = node->m_cube.m_values;
                     vector<expr_ref_vector> bvalues;
                     for (unsigned i = 0; i < ri->get_tail_size(); ++i) {
                         node_info const* qnode = node->m_parent_nodes[i];
-                        bvalues.push_back(qnode->m_values);
+                        bvalues.push_back(qnode->m_cube.m_values);
                     }
                     expr_ref_vector rule_subst(m);
                     expr_ref_vector terms = get_rule_terms(ri, item.m_args, hvalues, bvalues, rule_subst);
@@ -1020,11 +1020,11 @@ namespace predabst {
                 rule_info const* ri = node->m_parent_rule;
 
                 STRACE("predabst", tout << "To reach node " << node << " (" << node->m_symbol << "(" << args << ")) via rule " << ri << " requires:\n";);
-                expr_ref_vector const& hvalues = node->m_values;
+                expr_ref_vector const& hvalues = node->m_cube.m_values;
                 vector<expr_ref_vector> bvalues;
                 for (unsigned i = 0; i < ri->get_tail_size(); ++i) {
                     node_info const* qnode = node->m_parent_nodes[i];
-                    bvalues.push_back(qnode->m_values);
+                    bvalues.push_back(qnode->m_cube.m_values);
                 }
                 expr_ref_vector rule_subst(m);
                 expr_ref_vector terms = get_rule_terms(ri, args, hvalues, bvalues, rule_subst, substitute_template_params);
