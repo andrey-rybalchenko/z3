@@ -27,7 +27,6 @@ Revision History:
 #include "simplifier.h"
 #include "arith_simplifier_plugin.h"
 #include <vector>
-#include <map>
 #include <algorithm>
 
 namespace predabst {
@@ -60,10 +59,10 @@ namespace predabst {
     };
 
     class predabst_core::imp {
-        struct acr_error {
+        struct counterexample {
             node_info const*    const m_node;
             counterexample_kind const m_kind;
-            acr_error(node_info const* node, counterexample_kind kind) :
+            counterexample(node_info const* node, counterexample_kind kind) :
                 m_node(node),
                 m_kind(kind) {}
         };
@@ -206,10 +205,10 @@ namespace predabst {
                 // We managed to find a solution.
                 return true;
             }
-            catch (acr_error const& counterexample) {
+            catch (counterexample const& c) {
                 // We failed to find a solution.
-                m_counterexample_kind = counterexample.m_kind;
-                m_counterexample_node = counterexample.m_node;
+                m_counterexample_kind = c.m_kind;
+                m_counterexample_node = c.m_node;
                 return false;
             }
         }
@@ -257,7 +256,7 @@ namespace predabst {
             CASSERT("predabst", c1.m_cube.size() == c2.m_cube.size());
             unsigned size = c1.m_cube.size();
             for (unsigned i = 0; i < size; ++i) {
-                if (c2.m_cube[i] && !c1.m_cube[i]) {
+                if (c2.m_cube.get(i) && !c1.m_cube.get(i)) {
                     return false;
                 }
             }
@@ -268,11 +267,11 @@ namespace predabst {
             return true;
         }
 
-        expr_ref cube_to_formula(vector<bool> const& cube, expr_ref_vector const& preds) const {
+        expr_ref cube_to_formula(bit_vector const& cube, expr_ref_vector const& preds) const {
             expr_ref_vector es(m);
             CASSERT("predabst", cube.size() == preds.size());
             for (unsigned i = 0; i < cube.size(); ++i) {
-                if (cube[i]) {
+                if (cube.get(i)) {
                     es.push_back(preds[i]);
                 }
             }
@@ -643,7 +642,7 @@ namespace predabst {
                         unsigned num_preds = body_preds.size();
                         CASSERT("predabst", num_preds == cube.m_cube.size());
                         for (unsigned j = 0; j < num_preds; ++j) {
-                            if (cube.m_cube[j]) {
+                            if (cube.m_cube.get(j)) {
                                 if (m_fp_params.predabst_skip_false_body_preds() && m.is_false(body_preds[j])) {
                                     // Skip parent nodes that are trivially inconsistent with this rule.
                                     skip = true;
@@ -691,7 +690,7 @@ namespace predabst {
                     unsigned num_preds = body_preds.size();
                     CASSERT("predabst", num_preds == cube.m_cube.size());
                     for (unsigned j = 0; j < num_preds; ++j) {
-                        if (cube.m_cube[j]) {
+                        if (cube.m_cube.get(j)) {
                             CASSERT("predabst", !(m_fp_params.predabst_skip_false_body_preds() && m.is_false(body_preds[j])));
                             if (m_fp_params.predabst_skip_true_body_preds() && m.is_true(body_preds[j])) {
                                 continue;
@@ -1052,14 +1051,14 @@ namespace predabst {
 
             unsigned num_preds = es.size();
             CASSERT("predabst", (!ri->get_decl() && (num_preds == 0)) || (num_preds == ri->get_decl()->m_preds.size()));
-            vector<bool> cube;
+            bit_vector cube;
             cube.resize(num_preds);
             for (unsigned i = 0; i < num_preds; ++i) {
                 if (m_fp_params.predabst_skip_false_head_preds() && m.is_false(es.get(i))) {
-                    cube[i] = true;
+                    cube.set(i);
                 }
                 else if (m_fp_params.predabst_skip_true_head_preds() && m.is_true(es.get(i))) {
-                    cube[i] = false;
+                    cube.unset(i);
                 }
                 else {
                     if (m_fp_params.predabst_use_head_assumptions()) {
@@ -1070,7 +1069,7 @@ namespace predabst {
                         solver_for(ri)->assert_expr(es.get(i));
                     }
                     lbool result = check(solver_for(ri), assumptions.size(), assumptions.c_ptr());
-                    cube[i] = (result == l_false);
+                    cube.set(i, (result == l_false));
                     if (result == l_false) {
                         m_stats.m_num_head_checks_unsat++;
                     }
@@ -1092,12 +1091,12 @@ namespace predabst {
         void check_node_property(node_info const* node) {
             if (!node->m_symbol) {
                 STRACE("predabst", tout << "Reached query symbol\n";);
-                throw acr_error(node, reached_query);
+                throw counterexample(node, reached_query);
             }
             if (node->m_symbol->m_is_dwf) {
                 if (!is_well_founded(node)) {
                     STRACE("predabst", tout << "Formula is not well-founded\n";);
-                    throw acr_error(node, not_dwf);
+                    throw counterexample(node, not_dwf);
                 }
                 m_stats.m_num_well_founded_nodes++;
             }
@@ -1180,7 +1179,7 @@ namespace predabst {
             expr_ref_vector const& preds = node->m_symbol->m_preds;
             CASSERT("predabst", cube.m_cube.size() == preds.size());
             for (unsigned i = 0; i < cube.m_cube.size(); ++i) {
-                if (cube.m_cube[i]) {
+                if (cube.m_cube.get(i)) {
                     es.push_back(preds[i]);
                 }
             }

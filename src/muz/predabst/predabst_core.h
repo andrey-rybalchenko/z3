@@ -26,8 +26,8 @@ Revision History:
 namespace predabst {
     struct cube_t {
         expr_ref_vector const m_values;
-        vector<bool>    const m_cube;
-        cube_t(expr_ref_vector const& values, vector<bool> const& cube) :
+        bit_vector      const m_cube;
+        cube_t(expr_ref_vector const& values, bit_vector const& cube) :
             m_values(values),
             m_cube(cube) {
         }
