@@ -114,7 +114,7 @@ namespace predabst {
 
     class predabst_core {
         class imp;
-        imp* m_imp;
+        scoped_ptr<imp> m_imp;
 
     public:
         predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats);

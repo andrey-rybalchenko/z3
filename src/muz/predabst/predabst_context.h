@@ -28,10 +28,9 @@ namespace predabst {
     class dl_interface : public datalog::engine_base {
         class imp;
         datalog::context& m_ctx;
-        imp*              m_imp;
+        scoped_ptr<imp>   m_imp;
     public:
         dl_interface(datalog::context& ctx);
-        ~dl_interface();
         virtual lbool query(expr* query);
         virtual void cancel();
         virtual void cleanup();

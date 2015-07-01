@@ -72,7 +72,7 @@ namespace predabst {
         return args;
     }
 
-	expr_ref_vector rule_info::get_body(expr_ref_vector const& template_params, subst_util& subst) const {
+	expr_ref_vector rule_info::get_body(expr_ref_vector const& template_params, subst_util const& subst) const {
 		return inv_shift(subst.apply(m_body, template_params), template_params.size());
 	}
 

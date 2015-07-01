@@ -75,24 +75,28 @@ namespace predabst {
         node_vector                                   m_node_worklist;
         counterexample_kind							  m_counterexample_kind;
         node_info const*							  m_counterexample_node;
-        smt_params									  m_fparams;     // parameters specific to smt solving
-        smt::kernel*								  m_solver;
+        smt_params									  m_fparams;
+        scoped_ptr<smt::kernel>						  m_solver;
         mutable simplifier							  m_simplifier;
         fixedpoint_params const&					  m_fp_params;
         mutable core_stats&          			      m_stats;
-        subst_util									  m_subst;
+        subst_util						              m_subst;
         ast_manager&								  m;
 
     public:
         imp(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats) :
             m_rules(rules),
             m_template_param_values(template_param_values),
-            m_solver(NULL),
             m_simplifier(m),
             m_fp_params(fp_params),
             m_stats(stats),
             m_subst(m),
             m(m) {
+
+            if (m_fp_params.predabst_use_body_assumptions() && !m_fp_params.predabst_solver_per_rule() && !m_fp_params.predabst_summarize_cubes()) {
+                STRACE("predabst", tout << "Can't use body assumptions without having guard variables to assume\n";);
+                throw default_exception("can't use body assumptions without having guard variables to assume");
+            }
 
             if (m_fp_params.predabst_pre_simplify()) {
                 basic_simplifier_plugin* bsimp = alloc(basic_simplifier_plugin, m);
@@ -107,19 +111,11 @@ namespace predabst {
             }
 
             if (!m_fp_params.predabst_solver_per_rule()) {
-                m_solver = alloc(smt::kernel, m, m_fparams);
-                set_logic(m_solver);
+                m_solver = alloc_solver();
             }
             for (unsigned i = 0; i < m_rules.size(); ++i) {
                 rule_info const* ri = m_rules[i];
-                smt::kernel* solver;
-                if (m_fp_params.predabst_solver_per_rule()) {
-                    solver = alloc(smt::kernel, m, m_fparams);
-                    set_logic(solver);
-                }
-                else {
-                    solver = m_solver;
-                }
+                smt::kernel* solver = m_fp_params.predabst_solver_per_rule() ? alloc_solver() : m_solver.get();
                 try {
                     m_rule_instances.insert(ri, instantiate_rule(ri, solver));
                 }
@@ -127,7 +123,6 @@ namespace predabst {
                     if (m_fp_params.predabst_solver_per_rule()) {
                         dealloc(solver);
                     }
-                    dealloc(m_solver);
                     throw;
                 }
             }
@@ -139,9 +134,6 @@ namespace predabst {
         }
 
         ~imp() {
-            if (!m_fp_params.predabst_solver_per_rule()) {
-                dealloc(m_solver);
-            }
             for (unsigned i = 0; i < m_rules.size(); ++i) {
                 rule_info const* ri = m_rules[i];
                 if (m_fp_params.predabst_solver_per_rule()) {
@@ -195,12 +187,6 @@ namespace predabst {
                     m_node_worklist.erase(it);
                     inference_step(node);
                     infer_count++;
-
-                    if ((m_fp_params.predabst_max_predabst_iterations() > 0) &&
-                        (m_stats.m_num_nodes_dequeued >= m_fp_params.predabst_max_predabst_iterations())) {
-                        STRACE("predabst", tout << "Exceeded maximum number of iterations\n";);
-                        throw default_exception("exceeded maximum number of iterations");
-                    }
                 }
 
                 // We managed to find a solution.
@@ -236,14 +222,14 @@ namespace predabst {
         }
 
     private:
-        void set_logic(smt::kernel* solver) const { // >>> copied!
-            if (m_fp_params.predabst_solver_logic().bare_str()) { // >>> does this make sense?
-                bool result = solver->set_logic(m_fp_params.predabst_solver_logic());
-                CASSERT("predabst", result);
-            }
+        smt::kernel* alloc_solver() {
+            smt::kernel* solver = alloc(smt::kernel, m, m_fparams);
+            bool result = solver->set_logic(m_fp_params.predabst_solver_logic());
+            CASSERT("predabst", result);
+            return solver;
         }
 
-        inline smt::kernel* solver_for(rule_info const* ri) {
+        inline smt::kernel* solver_for(rule_info const* ri) const {
             return m_rule_instances[ri]->m_solver;
         }
 
@@ -255,11 +241,8 @@ namespace predabst {
                 return false;
             }
             CASSERT("predabst", c1.m_cube.size() == c2.m_cube.size());
-            unsigned size = c1.m_cube.size();
-            for (unsigned i = 0; i < size; ++i) {
-                if (c2.m_cube.get(i) && !c1.m_cube.get(i)) {
-                    return false;
-                }
+            if (!c1.m_cube.contains(c2.m_cube)) {
+                return false;
             }
             // This algorithm is sufficient because cubes are not arbitrary
             // subsets of the predicate list: if a predicate in the list is
@@ -300,7 +283,7 @@ namespace predabst {
             }
         }
 
-        vector<bool> known_exprs(expr_ref_vector const& exprs) {
+        vector<bool> known_exprs(expr_ref_vector const& exprs) const {
             vector<bool> known_exprs;
             for (unsigned i = 0; i < exprs.size(); ++i) {
                 bool known = get_all_vars(expr_ref(exprs.get(i), m)).empty();
@@ -381,7 +364,7 @@ namespace predabst {
 
         // Returns a substitution vector mapping each variable used in ri to a
         // fresh constant.
-        static expr_ref_vector get_subst_vect_free(rule_info const* ri, char const* prefix, ast_manager& m) {
+        static expr_ref_vector get_fresh_rule_subst(rule_info const* ri, char const* prefix, ast_manager& m) {
             expr_ref_vector rule_subst(m);
 
             used_vars used = ri->get_used_vars();
@@ -396,9 +379,9 @@ namespace predabst {
             return rule_subst;
         }
 
-        rule_instance_info* instantiate_rule(rule_info const* ri, smt::kernel* solver) {
+        rule_instance_info* instantiate_rule(rule_info const* ri, smt::kernel* solver) const {
             STRACE("predabst", tout << "Instantiating rule " << ri << "\n";);
-            rule_instance_info* info = alloc(rule_instance_info, get_subst_vect_free(ri, "s", m), solver, m);
+            rule_instance_info* info = alloc(rule_instance_info, get_fresh_rule_subst(ri, "s", m), solver, m);
 
             try {
                 // create ground body
@@ -438,16 +421,12 @@ namespace predabst {
                 }
 
                 if (m_fp_params.predabst_solver_per_rule()) {
-                    for (unsigned i = 0; i < info->m_body.size(); ++i) {
-                        solver->assert_expr(info->m_body.get(i));
-                    }
+                    assert_exprs(*solver, info->m_body);
                 }
 
                 scoped_push _push1(*solver); // >>> unnecessary if solver_per_rule
                 if (!m_fp_params.predabst_solver_per_rule()) {
-                    for (unsigned i = 0; i < info->m_body.size(); ++i) {
-                        solver->assert_expr(info->m_body.get(i));
-                    }
+                    assert_exprs(*solver, info->m_body);
                 }
 
                 lbool result = check(solver);
@@ -475,58 +454,52 @@ namespace predabst {
 
             scoped_push push(*solver_for(ri)); // >>> unnecessary if solver per rule
             if (!m_fp_params.predabst_solver_per_rule()) {
-                for (unsigned i = 0; i < info->m_body.size(); ++i) {
-                    solver_for(ri)->assert_expr(info->m_body.get(i));
-                }
+                assert_exprs(*solver_for(ri), info->m_body);
             }
 
             // create instantiations for head applications
             symbol_info const* si = ri->get_decl();
             if (si) {
-                expr_ref_vector head_args = m_subst.apply(ri->get_abstracted_args(), info->m_rule_subst);
-                expr_ref_vector head_preds = app_inst_preds(si, head_args, info->m_head_preds.size());
-                invert(head_preds);
-                pre_simplify(head_preds);
+                expr_ref_vector args = m_subst.apply(ri->get_abstracted_args(), info->m_rule_subst);
+                expr_ref_vector new_preds = instantiate_new_preds(si, args, info->m_head_preds.size());
+                invert(new_preds);
+                pre_simplify(new_preds);
                 if (m_fp_params.predabst_convert_true_head_preds()) {
-                    maybe_make_true(head_preds, solver_for(ri));
+                    maybe_make_true(new_preds, solver_for(ri));
                 }
                 if (m_fp_params.predabst_convert_false_head_preds()) {
-                    maybe_make_false(head_preds, solver_for(ri));
+                    maybe_make_false(new_preds, solver_for(ri));
                 }
                 if (m_fp_params.predabst_solver_per_rule()) {
-                    assert_guarded_exprs(head_preds, solver_for(ri));
+                    assert_guarded_exprs(new_preds, solver_for(ri));
                 }
-                else {
-                    info->m_head_preds.append(head_preds);
-                    m_stats.m_num_head_predicates += head_preds.size();
-                }
+                info->m_head_preds.append(new_preds);
+                m_stats.m_num_head_predicates += new_preds.size();
             }
 
             // create instantiations for body applications
             for (unsigned i = 0; i < ri->get_tail_size(); ++i) {
                 symbol_info const* si = ri->get_decl(i);
                 CASSERT("predabst", si);
-                expr_ref_vector body_args = m_subst.apply(ri->get_abstracted_args(i), info->m_rule_subst);
-                expr_ref_vector body_preds = app_inst_preds(si, body_args, info->m_body_preds.get(i).size());
-                pre_simplify(body_preds);
+                expr_ref_vector args = m_subst.apply(ri->get_abstracted_args(i), info->m_rule_subst);
+                expr_ref_vector new_preds = instantiate_new_preds(si, args, info->m_body_preds.get(i).size());
+                pre_simplify(new_preds);
                 if (m_fp_params.predabst_convert_true_body_preds()) {
-                    maybe_make_true(body_preds, solver_for(ri));
+                    maybe_make_true(new_preds, solver_for(ri));
                 }
                 if (m_fp_params.predabst_convert_false_body_preds()) {
-                    maybe_make_false(body_preds, solver_for(ri));
+                    maybe_make_false(new_preds, solver_for(ri));
                 }
                 if (m_fp_params.predabst_solver_per_rule()) {
-                    assert_guarded_exprs(body_preds, solver_for(ri));
+                    assert_guarded_exprs(new_preds, solver_for(ri));
                 }
-                else {
-                    info->m_body_preds.get(i).append(body_preds);
-                    m_stats.m_num_body_predicates += body_preds.size();
-                }
+                info->m_body_preds.get(i).append(new_preds);
+                m_stats.m_num_body_predicates += new_preds.size();
             }
         }
 
         // instantiate each predicate by replacing its free variables with (grounded) arguments of gappl
-        expr_ref_vector app_inst_preds(symbol_info const* si, expr_ref_vector const& args, unsigned num_pred_instances) {
+        expr_ref_vector instantiate_new_preds(symbol_info const* si, expr_ref_vector const& args, unsigned num_pred_instances) const {
             // instantiation maps preds variables to head arguments
             expr_ref_vector inst = m_subst.build(si->m_abstracted_vars, args);
             // preds instantiates to inst_preds
@@ -559,7 +532,7 @@ namespace predabst {
             }
         }
 
-        uint_set get_rule_body_positions(rule_info const* ri, symbol_info const* si) {
+        uint_set get_rule_body_positions(rule_info const* ri, symbol_info const* si) const {
             uint_set positions;
             for (unsigned i = 0; i < ri->get_tail_size(); ++i) {
                 if (ri->get_decl(i) == si) {
@@ -569,7 +542,7 @@ namespace predabst {
             return positions;
         }
 
-        bool model_eval_true(model_ref const& modref, expr_ref const& cube) {
+        bool model_eval_true(model_ref const& modref, expr_ref const& cube) const {
             expr_ref val(m);
             if (m_fp_params.predabst_summarize_cubes()) { // >>> and not summarize_via_iff?
                 if (!modref->eval(cube, val)) {
@@ -668,7 +641,7 @@ namespace predabst {
             }
 
             // Build the sets of cubes for each position.
-            vector<vector<expr_ref_vector>> all_cubes; // >>> I'm not sure vector<vector<...>> works correctly, since vector's copy-constructor copies its members using memcpy.
+            vector<vector<expr_ref_vector>> all_cubes;
             for (unsigned i = 0; i < all_nodes.size(); ++i) {
                 node_vector pos_nodes = all_nodes.get(i);
                 vector<expr_ref_vector> pos_cubes;
@@ -710,9 +683,7 @@ namespace predabst {
             scoped_push _push1(*solver_for(ri));
 
             if (!m_fp_params.predabst_solver_per_rule()) {
-                for (unsigned i = 0; i < info->m_body.size(); ++i) {
-                    solver_for(ri)->assert_expr(info->m_body[i]);
-                }
+                assert_exprs(*solver_for(ri), info->m_body);
             }
 
             expr_ref_vector head_es = info->m_head_preds;
@@ -720,12 +691,6 @@ namespace predabst {
                 if (m_fp_params.predabst_use_head_assumptions()) {
                     assert_guarded_exprs(head_es, solver_for(ri));
                 }
-            }
-
-            // >>> move to query()
-            if (m_fp_params.predabst_use_body_assumptions() && !m_fp_params.predabst_solver_per_rule() && !m_fp_params.predabst_summarize_cubes()) {
-                STRACE("predabst", tout << "Can't use body assumptions without having guard variables to assume\n";);
-                throw default_exception("can't use body assumptions without having guard variables to assume");
             }
 
             if (m_fp_params.predabst_summarize_cubes()) {
@@ -853,7 +818,7 @@ namespace predabst {
         }
 
         template<typename T>
-        vector<unsigned> get_rule_position_ordering(vector<vector<T>> const& sizes) {
+        vector<unsigned> get_rule_position_ordering(vector<vector<T>> const& sizes) const {
             std::vector<std::pair<unsigned, unsigned>> pos_counts;
             for (unsigned i = 0; i < sizes.size(); ++i) {
                 unsigned n = sizes.get(i).size();
@@ -872,7 +837,7 @@ namespace predabst {
             return positions;
         }
 
-        node_vector reorder_nodes(node_vector const& nodes, vector<unsigned> const& pos_order) {
+        node_vector reorder_nodes(node_vector const& nodes, vector<unsigned> const& pos_order) const {
             CASSERT("predabst", nodes.size() == pos_order.size());
             node_vector reordered;
             reordered.reserve(pos_order.size());
@@ -882,7 +847,7 @@ namespace predabst {
             return reordered;
         }
 
-        void reorder_output_nodes(std::ostream& out, node_vector const& nodes, vector<unsigned> const& pos_order) {
+        void reorder_output_nodes(std::ostream& out, node_vector const& nodes, vector<unsigned> const& pos_order) const {
             CASSERT("predabst", nodes.size() <= pos_order.size());
             node_vector reordered;
             vector<bool> found;
@@ -937,9 +902,7 @@ namespace predabst {
                         }
                         else {
                             solver_for(ri)->push();
-                            for (unsigned k = 0; k < pos_cube.size(); ++k) {
-                                solver_for(ri)->assert_expr(pos_cube.get(k));
-                            }
+                            assert_exprs(*solver_for(ri), pos_cube);
                         }
 
                         bool sat = true;
@@ -1089,7 +1052,7 @@ namespace predabst {
             return cube_t(values, cube);
         }
 
-        void check_node_property(node_info const* node) {
+        void check_node_property(node_info const* node) const {
             if (!node->m_symbol) {
                 STRACE("predabst", tout << "Reached query symbol\n";);
                 throw counterexample(node, reached_query);
@@ -1103,7 +1066,7 @@ namespace predabst {
             }
         }
 
-        bool is_well_founded(node_info const* node) {
+        bool is_well_founded(node_info const* node) const {
             symbol_info const* si = node->m_symbol;
             CASSERT("predabst", si->m_is_dwf);
 
@@ -1232,9 +1195,8 @@ namespace predabst {
     predabst_core::predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats) :
         m_imp(alloc(imp, symbols, rules, template_param_values, fp_params, m, stats)) {
     }
-    
+
     predabst_core::~predabst_core() {
-        dealloc(m_imp);
     }
 
     bool predabst_core::find_solution(unsigned refine_count) {

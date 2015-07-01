@@ -208,27 +208,22 @@ namespace predabst {
         }
 
     private:
-        // Returns a substitution vector (i.e. a vector indexed by variable
-        // number) covering all the variables used by r, which maps the variables
-        // used as head arguments to hvars, and maps all variables that do not
-        // appear in the head to fresh constants.
-        expr_ref_vector get_subst_vect(rule_info const* ri, expr_ref_vector const& hvars, expr_ref_vector const& hvalues, vector<expr_ref_vector> const& bvalues, char const* prefix, expr_ref_vector& unification_terms) const {
+        expr_ref_vector get_rule_terms(rule_info const* ri, expr_ref_vector const& hargs, expr_ref_vector const& hvalues, vector<expr_ref_vector> const& bvalues, expr_ref_vector& rule_subst, bool substitute_template_params = true) const {
+            CASSERT("predabst", rule_subst.empty());
             used_vars used = ri->get_used_vars();
-
-            expr_ref_vector rule_subst(m);
             rule_subst.reserve(used.get_max_found_var_idx_plus_1());
 
             // Variables that appear bare in the non-explicit head are mapped to the first corresponding argument.
             vector<bool> constraint_needed;
             expr_ref_vector head_args = ri->get_abstracted_args();
-            CASSERT("predabst", head_args.size() == hvars.size());
+            CASSERT("predabst", head_args.size() == hargs.size());
             for (unsigned i = 0; i < head_args.size(); ++i) {
                 bool assigned = false;
                 if (is_var(head_args.get(i))) {
                     unsigned idx = to_var(head_args.get(i))->get_idx();
                     CASSERT("predabst", idx < rule_subst.size());
                     if (!rule_subst.get(idx)) {
-                        rule_subst[idx] = hvars.get(i);
+                        rule_subst[idx] = hargs.get(i);
                         assigned = true;
                     }
                 }
@@ -276,22 +271,22 @@ namespace predabst {
                 if (!rule_subst.get(i)) {
                     sort* s = used.get(i);
                     if (s) {
-                        rule_subst[i] = m.mk_fresh_const(prefix, s);
+                        rule_subst[i] = m.mk_fresh_const("s", s);
                     }
                 }
             }
 
             // Generate constraints for all head or explicit body argument positions that were not mapped directly to the corresponding argument.
-            CASSERT("predabst", unification_terms.empty());
+            expr_ref_vector terms(m);
             for (unsigned i = 0; i < head_args.size(); ++i) {
                 if (constraint_needed[i]) {
-                    unification_terms.push_back(m.mk_eq(m_subst.apply(head_args.get(i), rule_subst), hvars.get(i)));
+                    terms.push_back(m.mk_eq(m_subst.apply(head_args.get(i), rule_subst), hargs.get(i)));
                 }
             }
 
             for (unsigned i = 0; i < head_eargs.size(); ++i) {
                 if (head_exp_constraint_needed[i]) {
-                    unification_terms.push_back(m.mk_eq(m_subst.apply(head_eargs.get(i), rule_subst), hvalues.get(i)));
+                    terms.push_back(m.mk_eq(m_subst.apply(head_eargs.get(i), rule_subst), hvalues.get(i)));
                 }
             }
 
@@ -300,28 +295,20 @@ namespace predabst {
                 CASSERT("predabst", body_eargs.size() == bvalues.get(i).size());
                 for (unsigned j = 0; j < body_eargs.size(); ++j) {
                     if (body_exp_constraint_needed[i][j]) {
-                        unification_terms.push_back(m.mk_eq(m_subst.apply(body_eargs.get(j), rule_subst), bvalues.get(i).get(j)));
+                        terms.push_back(m.mk_eq(m_subst.apply(body_eargs.get(j), rule_subst), bvalues.get(i).get(j)));
                     }
                 }
             }
 
-            return rule_subst;
-        }
-
-        expr_ref_vector get_rule_terms(rule_info const* ri, expr_ref_vector const& hargs, expr_ref_vector const& hvalues, vector<expr_ref_vector> const& bvalues, expr_ref_vector& rule_subst, bool substitute_template_params = true) const {
-            CASSERT("predabst", rule_subst.empty());
-            expr_ref_vector unification_terms(m);
-            rule_subst.swap(get_subst_vect(ri, hargs, hvalues, bvalues, "s", unification_terms));
             expr_ref_vector const& temp_params = substitute_template_params ? m_template_param_values : m_template_params;
-            expr_ref_vector body_terms = m_subst.apply(ri->get_body(temp_params, m_subst), rule_subst);
-            return vector_concat(unification_terms, body_terms);
+            terms.append(m_subst.apply(ri->get_body(temp_params, m_subst), rule_subst));
+
+            return terms;
         }
 
         void set_logic(smt::kernel& solver) const {
-            if (m_fp_params.predabst_solver_logic().bare_str()) { // >>> does this make sense?
-                bool result = solver.set_logic(m_fp_params.predabst_solver_logic());
-                CASSERT("predabst", result);
-            }
+            bool result = solver.set_logic(m_fp_params.predabst_solver_logic());
+            CASSERT("predabst", result);
         }
 
         model_ref make_model(predabst_core const& core) const {
@@ -363,7 +350,6 @@ namespace predabst {
                     m_stats.m_num_refinement_iterations++;
                     STRACE("predabst", print_refinement_state(tout, refine_count););
 
-                    // >>> accumulate the statistics from the core
                     if (core.find_solution(refine_count)) {
                         STRACE("predabst", tout << "Solution found: result is SAT\n";);
                         m_model = make_model(core);
@@ -408,7 +394,21 @@ namespace predabst {
                             // The problem persists without abstraction.  Unless
                             // we can refine the templates, we have a proof of
                             // unsatisfiability.
-                            constrain_templates(error_node, error_args, error_kind);
+                            expr_ref criterion(m);
+                            if (error_kind == reached_query) {
+                                STRACE("predabst", tout << "Refining templates (reached query)\n";);
+                                criterion = m.mk_false();
+                            }
+                            else {
+                                CASSERT("predabst", error_kind == not_dwf);
+                                STRACE("predabst", tout << "Refining templates (not well-founded)\n";);
+                                expr_ref bound(m);
+                                expr_ref decrease(m);
+                                well_founded_bound_and_decrease(error_args, bound, decrease);
+                                criterion = m.mk_and(bound, decrease);
+                            }
+
+                            constrain_templates(error_node, error_args, criterion);
                             STRACE("predabst", tout << "Attempting template refinement\n";);
                             break;
                         }
@@ -609,22 +609,11 @@ namespace predabst {
             si->m_preds.push_back(pred);
         }
 
-        void constrain_templates(node_info const* error_node, expr_ref_vector const& error_args, counterexample_kind error_kind) {
+        void constrain_templates(node_info const* error_node, expr_ref_vector const& error_args, expr_ref const& criterion) {
             expr_ref cs = mk_leaves(error_node, error_args, false);
             quantifier_elimination(vector_concat(error_args, m_template_params), cs);
 
-            expr_ref to_solve(m);
-            if (error_kind == reached_query) {
-                STRACE("predabst", tout << "Refining templates (reached query)\n";);
-                to_solve = template_constraint_reached_query(cs);
-            }
-            else {
-                CASSERT("predabst", error_kind == not_dwf);
-                STRACE("predabst", tout << "Refining templates (not well-founded)\n";);
-                to_solve = template_constraint_not_wf(error_args, cs);
-            }
-
-            m_template_constraints.push_back(to_solve);
+            m_template_constraints.push_back(m.mk_or(m.mk_not(cs), criterion));
 
             expr_ref_vector evars = get_all_vars(cs);
             for (unsigned i = 0; i < error_args.size(); ++i) {
@@ -636,17 +625,6 @@ namespace predabst {
 
             m_template_constraint_vars.append(error_args);
             m_template_constraint_vars.append(evars);
-        }
-
-        expr_ref template_constraint_reached_query(expr_ref const& cs) {
-            return expr_ref(m.mk_not(cs), m);
-        }
-
-        expr_ref template_constraint_not_wf(expr_ref_vector const& args, expr_ref const& cs) {
-            expr_ref bound(m);
-            expr_ref decrease(m);
-            well_founded_bound_and_decrease(args, bound, decrease);
-            return expr_ref(m.mk_or(m.mk_not(cs), m.mk_and(bound, decrease)), m);
         }
 
         unsigned reduce_unsat(smt::kernel& solver, expr* const* assumptions, unsigned lo, unsigned hi, obj_map<expr, unsigned> const& assumption_to_index) const {
@@ -1065,12 +1043,8 @@ namespace predabst {
             if (m_input->m_template_extras) {
                 solver.assert_expr(m_subst.apply(m_input->m_template_extras, m_subst.build(m_input->m_template_vars, m_template_params)));
             }
-            for (unsigned i = 0; i < constraints.size(); ++i) {
-                solver.assert_expr(constraints.get(i));
-            }
-            for (unsigned i = 0; i < lambda_constraints.size(); ++i) {
-                solver.assert_expr(lambda_constraints.get(i));
-            }
+            assert_exprs(solver, constraints);
+            assert_exprs(solver, lambda_constraints);
             if (check(&solver) != l_true) {
                 STRACE("predabst", tout << "Failed to solve template constraints\n";);
                 return false;
@@ -1138,9 +1112,6 @@ namespace predabst {
         engine_base(ctx.get_manager(), "predabst"),
         m_ctx(ctx),
         m_imp(alloc(imp, ctx.get_manager(), ctx.get_params())) {
-    }
-    dl_interface::~dl_interface() {
-        dealloc(m_imp);
     }
     lbool dl_interface::query(expr* query) {
         m_ctx.ensure_opened();

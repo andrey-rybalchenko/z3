@@ -23,6 +23,7 @@ Revision History:
 #include "ast_pp.h"
 #include "used_vars.h"
 #include "dl_rule.h"
+#include "smt_kernel.h"
 #include "var_subst.h"
 
 namespace predabst {
@@ -213,9 +214,12 @@ namespace predabst {
 	// Returns the set of variables used by r.
 	used_vars get_used_vars(datalog::rule const* r);
 
+    // Asserts each of the expressions in exprs.
+    void assert_exprs(smt::kernel& solver, expr_ref_vector const& exprs);
+
 	class subst_util {
-		ast_manager& m;
-		var_subst    m_var_subst;
+		ast_manager&      m;
+		mutable var_subst m_var_subst;
 
 	public:
 		subst_util(ast_manager& m) :
@@ -224,14 +228,14 @@ namespace predabst {
 		}
 
 		// Apply a substitution vector to an expression, returning the result.
-		expr_ref apply(expr* expr, expr_ref_vector const& subst) {
+		expr_ref apply(expr* expr, expr_ref_vector const& subst) const {
 			expr_ref expr2(m);
 			m_var_subst(expr, subst.size(), subst.c_ptr(), expr2);
 			return expr2;
 		}
 
 		// Apply a substitution vector to an application expression, returning the result.
-		app_ref apply(app* app, expr_ref_vector const& subst) {
+		app_ref apply(app* app, expr_ref_vector const& subst) const {
 			expr_ref expr2(m);
 			m_var_subst(app, subst.size(), subst.c_ptr(), expr2);
 			return app_ref(to_app(expr2), m);
@@ -239,7 +243,7 @@ namespace predabst {
 
 		// Apply a substitution vector to each expression in a vector of
 		// expressions, returning the result.
-		expr_ref_vector apply(expr_ref_vector const& exprs, expr_ref_vector const& subst) {
+		expr_ref_vector apply(expr_ref_vector const& exprs, expr_ref_vector const& subst) const {
 			expr_ref_vector exprs2(m);
 			exprs2.reserve(exprs.size());
 			for (unsigned i = 0; i < exprs.size(); ++i) {
@@ -250,7 +254,7 @@ namespace predabst {
 
 		// Returns a substitution vector that maps each variable in vars to the
 		// corresponding expression in exprs.
-		expr_ref_vector build(unsigned n, var* const* vars, expr* const* exprs) {
+		expr_ref_vector build(unsigned n, var* const* vars, expr* const* exprs) const {
 			expr_ref_vector inst(m);
 			inst.reserve(n); // note that this is not necessarily the final size of inst
 			for (unsigned i = 0; i < n; ++i) {
@@ -262,20 +266,20 @@ namespace predabst {
 			return inst;
 		}
 
-		expr_ref_vector build(var* const* vars, expr_ref_vector const& exprs) {
+		expr_ref_vector build(var* const* vars, expr_ref_vector const& exprs) const {
 			return build(exprs.size(), vars, exprs.c_ptr());
 		}
 
-		expr_ref_vector build(var_ref_vector const& vars, expr* const* exprs) {
+		expr_ref_vector build(var_ref_vector const& vars, expr* const* exprs) const {
 			return build(vars.size(), vars.c_ptr(), exprs);
 		}
 
-		expr_ref_vector build(var_ref_vector const& vars, expr_ref_vector const& exprs) {
+		expr_ref_vector build(var_ref_vector const& vars, expr_ref_vector const& exprs) const {
 			CASSERT("predabst", vars.size() == exprs.size());
 			return build(vars.size(), vars.c_ptr(), exprs.c_ptr());
 		}
 
-		expr_ref_vector build(var_ref_vector const& vars, var_ref_vector const& exprs) {
+		expr_ref_vector build(var_ref_vector const& vars, var_ref_vector const& exprs) const {
 			CASSERT("predabst", vars.size() == exprs.size());
 			return build(vars.size(), vars.c_ptr(), (expr* const*)exprs.c_ptr());
 		}

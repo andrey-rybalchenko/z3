@@ -172,7 +172,7 @@ namespace predabst {
         expr_ref_vector get_explicit_args(unsigned i) const;
 
 		// Returns the interpreted body of the rule, as a list of conjuncts in NNF.
-		expr_ref_vector get_body(expr_ref_vector const& template_params, subst_util& subst) const;
+		expr_ref_vector get_body(expr_ref_vector const& template_params, subst_util const& subst) const;
 
 		// Returns the variables used by the rule.
 		used_vars get_used_vars() const;

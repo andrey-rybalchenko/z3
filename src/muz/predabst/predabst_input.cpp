@@ -230,6 +230,7 @@ namespace predabst {
         void find_all_symbols(datalog::rule_set const& rules) {
             for (unsigned i = 0; i < rules.get_num_rules(); ++i) {
                 rule* r = rules.get_rule(i);
+                CASSERT("predabst", r->get_positive_tail_size() == r->get_uninterpreted_tail_size());
                 func_decl* head_decl = r->get_decl();
                 if (is_regular_predicate(head_decl)) {
                     process_symbol(rules, head_decl);

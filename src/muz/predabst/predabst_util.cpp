@@ -507,4 +507,11 @@ namespace predabst {
 		}
 		return used;
 	}
+
+    // Asserts each of the expressions in exprs.
+    void assert_exprs(smt::kernel& solver, expr_ref_vector const& exprs) {
+        for (unsigned i = 0; i < exprs.size(); ++i) {
+            solver.assert_expr(exprs.get(i));
+        }
+    }
 }
