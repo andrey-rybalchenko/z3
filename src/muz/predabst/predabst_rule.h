@@ -201,6 +201,6 @@ namespace predabst {
             return m_rule->get_tail(m_symbol_pos[i]);
         }
     };
-};
+}
 
 #endif /* _PREDABST_RULE_H_ */

@@ -20,6 +20,7 @@ Revision History:
 #define _PREDABST_CORE_H_
 
 #include "predabst_rule.h"
+#include "predabst_cancel.h"
 #include "ast.h"
 #include "fixedpoint_params.hpp"
 
@@ -117,13 +118,13 @@ namespace predabst {
         scoped_ptr<imp> m_imp;
 
     public:
-        predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats);
+        predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, cancellation_manager& cm, ast_manager& m, core_stats& stats);
         ~predabst_core();
         bool find_solution(unsigned refine_count);
         expr_ref get_model(symbol_info const* si) const;
         counterexample_kind get_counterexample_kind() const;
         node_info const* get_counterexample() const;
     };
-};
+}
 
 #endif /* _PREDABST_CORE_H_ */

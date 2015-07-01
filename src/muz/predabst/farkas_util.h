@@ -20,6 +20,7 @@ Revision History:
 #define _FARKAS_UTIL_H_
 
 #include "ast.h"
+#include "predabst_cancel.h"
 
 namespace predabst {
 	typedef enum { linear, bilinear, bilinear_single } lambda_kind;
@@ -81,7 +82,7 @@ namespace predabst {
 
 		friend std::ostream& operator<<(std::ostream& out, linear_inequality const& lineq);
 		friend class farkas_imp;
-		friend void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs);
+		friend void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm);
 	};
 
 	struct lambda_info {
@@ -96,13 +97,13 @@ namespace predabst {
 		}
 	};
 
-	bool mk_exists_forall_farkas(expr_ref const& fml, expr_ref_vector const& vars, expr_ref_vector& constraints, vector<lambda_info>& lambda_infos, bool eliminate_unsat_disjuncts = false);
+	bool mk_exists_forall_farkas(expr_ref const& fml, expr_ref_vector const& vars, expr_ref_vector& constraints, vector<lambda_info>& lambda_infos, cancellation_manager& cm, bool eliminate_unsat_disjuncts = false);
 
-	void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs);
+	void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm);
 
 	void well_founded_bound_and_decrease(expr_ref_vector const& vsws, expr_ref& bound, expr_ref& decrease);
 
-	bool well_founded(expr_ref_vector const& vsws, expr_ref const& lhs, expr_ref* sol_bound, expr_ref* sol_decrease);
+	bool well_founded(expr_ref_vector const& vsws, expr_ref const& lhs, expr_ref* sol_bound, expr_ref* sol_decrease, cancellation_manager& cm);
 
 	expr_ref_vector mk_bilinear_lambda_constraints(vector<lambda_info> const& lambda_infos, int max_lambda, ast_manager& m);
 

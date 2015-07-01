@@ -79,16 +79,18 @@ namespace predabst {
         scoped_ptr<smt::kernel>						  m_solver;
         mutable simplifier							  m_simplifier;
         fixedpoint_params const&					  m_fp_params;
+        mutable cancellation_manager&                 m_cancellation_manager;
         mutable core_stats&          			      m_stats;
         subst_util						              m_subst;
         ast_manager&								  m;
 
     public:
-        imp(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats) :
+        imp(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, cancellation_manager& cm, ast_manager& m, core_stats& stats) :
             m_rules(rules),
             m_template_param_values(template_param_values),
             m_simplifier(m),
             m_fp_params(fp_params),
+            m_cancellation_manager(cm),
             m_stats(stats),
             m_subst(m),
             m(m) {
@@ -333,33 +335,7 @@ namespace predabst {
         }
 
         lbool check(smt::kernel* solver, unsigned num_assumptions = 0, expr* const* assumptions = 0) const {
-/*
-            {
-                // >>> atomic
-                if (m_cancel) {
-                    STRACE("predabst", tout << "Canceled!\n";);
-                    throw default_exception("canceled");
-                }
-                m_current_solver = solver;
-            }
-*/
-            lbool result = solver->check(num_assumptions, assumptions);
-/*
-            {
-                // >>> atomic
-                m_current_solver = NULL;
-                if (m_cancel) {
-                    solver->reset_cancel();
-                    STRACE("predabst", tout << "Canceled!\n";);
-                    throw default_exception("canceled");
-                }
-            }
-*/
-            if (result == l_undef) {
-                STRACE("predabst", tout << "Solver failed with " << solver->last_failure_as_string() << "\n";);
-                throw default_exception("(underlying-solver " + solver->last_failure_as_string() + ")");
-            }
-            return result;
+            return m_cancellation_manager.check(solver, num_assumptions, assumptions);
         }
 
         // Returns a substitution vector mapping each variable used in ri to a
@@ -1082,7 +1058,7 @@ namespace predabst {
             expr_ref_vector args = si->get_fresh_abstracted_args("s");
             expr_ref to_rank = m_subst.apply(expr, m_subst.build(si->m_abstracted_vars, args));
 
-            return well_founded(args, to_rank, NULL, NULL);
+            return well_founded(args, to_rank, NULL, NULL, m_cancellation_manager);
         }
 
         node_info const* add_node(rule_info const* ri, cube_t const& cube, node_vector const& nodes = node_vector()) {
@@ -1192,8 +1168,8 @@ namespace predabst {
         }
     };
 
-    predabst_core::predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats) :
-        m_imp(alloc(imp, symbols, rules, template_param_values, fp_params, m, stats)) {
+    predabst_core::predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, cancellation_manager& cm, ast_manager& m, core_stats& stats) :
+        m_imp(alloc(imp, symbols, rules, template_param_values, fp_params, cm, m, stats)) {
     }
 
     predabst_core::~predabst_core() {

@@ -40,6 +40,6 @@ namespace predabst {
         virtual expr_ref get_answer();
         virtual model_ref get_model();
     };
-};
+}
 
 #endif /* _PREDABST_CONTEXT_H_ */

@@ -18,6 +18,7 @@ Revision History:
 --*/
 #include "predabst_context.h"
 #include "predabst_util.h"
+#include "predabst_cancel.h"
 #include "farkas_util.h"
 #include "predabst_rule.h"
 #include "predabst_input.h"
@@ -101,13 +102,12 @@ namespace predabst {
             }
         };
 
-        ast_manager&                  m;             // manager for ASTs. It is used for managing expressions
+        ast_manager&                  m;
         mutable subst_util            m_subst;
         fixedpoint_params const&      m_fp_params;
-        mutable smt::kernel* volatile m_current_solver;
-        bool volatile                 m_cancel;      // Boolean flag to track external cancelation.
+        mutable cancellation_manager  m_cancellation_manager;
         model_ref                     m_model;
-        mutable stats                 m_stats;       // statistics information specific to the predabst module.
+        mutable stats                 m_stats;
         
         scoped_ptr<input>             m_input;
         expr_ref_vector               m_template_params;
@@ -134,8 +134,6 @@ namespace predabst {
             m(m),
             m_subst(m),
             m_fp_params(fp_params),
-            m_cancel(false),
-            m_current_solver(NULL),
             m_template_params(m),
             m_template_param_values(m),
             m_template_constraints(m),
@@ -169,18 +167,11 @@ namespace predabst {
         }
 
         void cancel() {
-            // >>> atomic
-            m_cancel = true;
-            smt::kernel* current_solver = m_current_solver;
-            if (current_solver) {
-                current_solver->cancel();
-            }
+            m_cancellation_manager.cancel();
         }
 
         void cleanup() {
-            // >>> atomic
-            CASSERT("predabst", !m_current_solver);
-            m_cancel = false;
+            m_cancellation_manager.reset_cancel();
         }
 
         void reset_statistics() {
@@ -339,7 +330,7 @@ namespace predabst {
                     return l_true;
                 }
 
-                predabst_core core(m_input->m_symbols, m_input->m_rules, m_template_param_values, m_fp_params, m, m_stats);
+                predabst_core core(m_input->m_symbols, m_input->m_rules, m_template_param_values, m_fp_params, m_cancellation_manager, m, m_stats);
 
                 // The only things that change on subsequent iterations of this loop are
                 // the predicate lists
@@ -418,29 +409,7 @@ namespace predabst {
         }
 
         lbool check(smt::kernel* solver, unsigned num_assumptions = 0, expr* const* assumptions = 0) const {
-            {
-                // >>> atomic
-                if (m_cancel) {
-                    STRACE("predabst", tout << "Canceled!\n";);
-                    throw default_exception("canceled");
-                }
-                m_current_solver = solver;
-            }
-            lbool result = solver->check(num_assumptions, assumptions);
-            {
-                // >>> atomic
-                m_current_solver = NULL;
-                if (m_cancel) {
-                    solver->reset_cancel();
-                    STRACE("predabst", tout << "Canceled!\n";);
-                    throw default_exception("canceled");
-                }
-            }
-            if (result == l_undef) {
-                STRACE("predabst", tout << "Solver failed with " << solver->last_failure_as_string() << "\n";);
-                throw default_exception("(underlying-solver " + solver->last_failure_as_string() + ")");
-            }
-            return result;
+            return m_cancellation_manager.check(solver, num_assumptions, assumptions);
         }
 
         expr_ref model_eval_app(model_ref const& md, app const* app) const {
@@ -524,7 +493,7 @@ namespace predabst {
             CASSERT("predabst", root_node->m_symbol->m_is_dwf);
             expr_ref actual_cube = mk_leaves(root_node, root_args);
             quantifier_elimination(root_args, actual_cube);
-            bool result = well_founded(root_args, actual_cube, &core_wf_info.m_bound, &core_wf_info.m_decrease);
+            bool result = well_founded(root_args, actual_cube, &core_wf_info.m_bound, &core_wf_info.m_decrease, m_cancellation_manager);
             STRACE("predabst", tout << "Node " << root_node << " is " << (result ? "" : "not ") << "well-founded without abstraction\n";);
             return result;
         }
@@ -937,7 +906,7 @@ namespace predabst {
             }
 
             vector<int64> assertion_coeffs;
-            get_farkas_coeffs(assertion_inequalities, assertion_coeffs);
+            get_farkas_coeffs(assertion_inequalities, assertion_coeffs, m_cancellation_manager);
             STRACE("predabst", {
                 tout << "Farkas coefficients are:\n";
                 for (unsigned i = 0; i < assertion_coeffs.size(); ++i) {
@@ -1025,7 +994,7 @@ namespace predabst {
 
             expr_ref_vector constraints(m);
             vector<lambda_info> lambda_infos;
-            bool result = mk_exists_forall_farkas(mk_conj(m_template_constraints), m_template_constraint_vars, constraints, lambda_infos, true);
+            bool result = mk_exists_forall_farkas(mk_conj(m_template_constraints), m_template_constraint_vars, constraints, lambda_infos, m_cancellation_manager, true);
             if (!result) {
                 STRACE("predabst", tout << "Failed to convert template constraints\n";);
                 return false;

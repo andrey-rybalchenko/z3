@@ -537,7 +537,7 @@ namespace predabst {
 	// The implementation uses Farkas's lemma; therefore it will fail (returning
 	// false) if the atomic boolean formulae in F are not all linear integer
 	// (in)equalities.
-	bool mk_exists_forall_farkas(expr_ref const& fml, expr_ref_vector const& vars, expr_ref_vector& constraints, vector<lambda_info>& lambdas, bool eliminate_unsat_disjuncts) {
+	bool mk_exists_forall_farkas(expr_ref const& fml, expr_ref_vector const& vars, expr_ref_vector& constraints, vector<lambda_info>& lambdas, cancellation_manager&cm, bool eliminate_unsat_disjuncts) {
 		ast_manager& m = fml.m();
 		arith_util arith(m);
 		CASSERT("predabst", is_well_sorted(m, fml));
@@ -563,10 +563,8 @@ namespace predabst {
 				smt_params new_param;
 				new_param.m_model = false;
 				smt::kernel solver(fml.m(), new_param);
-				for (unsigned j = 0; j < conjs.size(); ++j) {
-					solver.assert_expr(conjs.get(j));
-				}
-				if (solver.check() != l_true) {
+                assert_exprs(solver, conjs);
+				if (cm.check(&solver) != l_true) {
 					continue;
 				}
 			}
@@ -587,7 +585,7 @@ namespace predabst {
 		return true;
 	}
 
-	void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs) {
+	void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm) {
 		CASSERT("predabst", coeffs.empty());
 		CASSERT("predabst", !inequalities.empty());
 		ast_manager& m = inequalities[0].m;
@@ -601,10 +599,8 @@ namespace predabst {
 		smt_params new_param;
 		smt::kernel solver(m, new_param);
 		expr_ref_vector constraints = f_imp.get_constraints();
-		for (unsigned i = 0; i < constraints.size(); ++i) {
-			solver.assert_expr(constraints.get(i));
-		}
-		lbool lresult = solver.check();
+        assert_exprs(solver, constraints);
+        lbool lresult = cm.check(&solver);
 		CASSERT("predabst", lresult == l_true);
 		model_ref modref;
 		solver.get_model(modref);
@@ -662,7 +658,7 @@ namespace predabst {
 		CASSERT("predabst", is_well_sorted(m, decrease));
 	}
 
-	bool well_founded(expr_ref_vector const& vsws, expr_ref const& lhs, expr_ref* sol_bound, expr_ref* sol_decrease) {
+	bool well_founded(expr_ref_vector const& vsws, expr_ref const& lhs, expr_ref* sol_bound, expr_ref* sol_decrease, cancellation_manager& cm) {
 		ast_manager& m = lhs.get_manager();
 		CASSERT("predabst", vsws.size() % 2 == 0);
 		CASSERT("predabst", sort_is_bool(lhs, m));
@@ -684,7 +680,7 @@ namespace predabst {
 		// XXX Does passing true for eliminate_unsat_disjuncts help in the refinement case?
 		expr_ref_vector constraints(m);
 		vector<lambda_info> lambdas;
-		bool result = mk_exists_forall_farkas(to_solve, all_vars, constraints, lambdas);
+		bool result = mk_exists_forall_farkas(to_solve, all_vars, constraints, lambdas, cm);
 		if (!result) {
 			STRACE("predabst", tout << "Formula " << lhs << " is not (provably) well-founded: it does not comprise only linear integer (in)equalities\n";);
 			// XXX We need to distinguish between this case and where we have proven that the formula is not well-founded, or else we can end up returning UNSAT incorrectly
@@ -697,11 +693,8 @@ namespace predabst {
 			new_param.m_model = false;
 		}
 		smt::kernel solver(m, new_param);
-		for (unsigned i = 0; i < constraints.size(); ++i) {
-			solver.assert_expr(constraints.get(i));
-		}
-
-		if (solver.check() != l_true) {
+        assert_exprs(solver, constraints);
+		if (cm.check(&solver) != l_true) {
 			STRACE("predabst", tout << "Formula " << lhs << " is not well-founded: constraint is unsatisfiable\n";);
 			return false;
 		}
