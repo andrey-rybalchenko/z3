@@ -39,25 +39,26 @@ namespace predabst {
         return symbol(sym.str().substr(prefix.size()).c_str());
     }
 
-    class builder {
-        predabst_input*                     m_input;
+    class input_builder {
+        input*                              m_input;
         obj_map<func_decl, symbol_info*>    m_func_decl2symbol;
         obj_map<func_decl, template_info*>  m_func_decl2template;
-        predabst_input::stats               m_stats;
         subst_util                          m_subst;
         ast_manager&                        m;
+        input_stats&                        m_stats;
 
         fixedpoint_params const&            m_fp_params; // >>> doesn't belong here?
 
     public:
-        builder(ast_manager& m, fixedpoint_params const& fp_params) :
+        input_builder(ast_manager& m, input_stats& stats, fixedpoint_params const& fp_params) :
             m_input(NULL),
             m_subst(m),
             m(m),
+            m_stats(stats),
             m_fp_params(fp_params) {
         }
 
-        void convert_input(datalog::rule_set& rules, predabst_input* input) {
+        void convert_input(datalog::rule_set& rules, input* input) {
             m_input = input;
 
             find_all_symbols(rules);
@@ -77,9 +78,9 @@ namespace predabst {
             // before the predicate lists, so that we can use the argument
             // names to translate predicates from one predicate symbol to
             // another.
-            process_special_rules(rules, is_template_extra, &builder::collect_template_extra);
-            process_special_rules(rules, is_template, &builder::collect_template);
-            process_special_rules(rules, is_explicit_arg_list, &builder::collect_explicit_arg_list);
+            process_special_rules(rules, is_template_extra, &input_builder::collect_template_extra);
+            process_special_rules(rules, is_template, &input_builder::collect_template);
+            process_special_rules(rules, is_explicit_arg_list, &input_builder::collect_explicit_arg_list);
 
             for (unsigned i = 0; i < m_input->m_symbols.size(); ++i) {
                 symbol_info* si = m_input->m_symbols[i];
@@ -104,8 +105,8 @@ namespace predabst {
                 }
             }
 
-            process_special_rules(rules, is_arg_name_list, &builder::collect_arg_name_list);
-            process_special_rules(rules, is_predicate_list, &builder::collect_predicate_list);
+            process_special_rules(rules, is_arg_name_list, &input_builder::collect_arg_name_list);
+            process_special_rules(rules, is_predicate_list, &input_builder::collect_predicate_list);
 
             CASSERT("predabst", m_input->m_rules.empty());
             for (unsigned i = 0; i < rules.get_num_rules(); ++i) {
@@ -307,7 +308,7 @@ namespace predabst {
             return startswith(fdecl->get_name(), "__dwf__");
         }
 
-        void process_special_rules(datalog::rule_set& rules, bool(*p)(func_decl const*), void (builder::*f)(rule const*)) {
+        void process_special_rules(datalog::rule_set& rules, bool(*p)(func_decl const*), void (input_builder::*f)(rule const*)) {
             ptr_vector<rule> to_delete;
             for (unsigned i = 0; i < rules.get_num_rules(); ++i) {
                 rule* r = rules.get_rule(i);
@@ -625,15 +626,15 @@ namespace predabst {
         }
     };
 
-    predabst_input* make_predabst_input(datalog::rule_set& rules, fixedpoint_params const& fp_params) {
-        predabst_input* input = alloc(predabst_input, rules.get_manager());
+    input* make_input(datalog::rule_set& rules, input_stats& stats, fixedpoint_params const& fp_params) {
+        input* i = alloc(input, rules.get_manager());
         try {
-            builder b(rules.get_manager(), fp_params);
-            b.convert_input(rules, input);
-            return input;
+            input_builder b(rules.get_manager(), stats, fp_params);
+            b.convert_input(rules, i);
+            return i;
         }
         catch (...) {
-            dealloc(input);
+            dealloc(i);
             throw;
         }
     }

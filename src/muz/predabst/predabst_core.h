@@ -60,64 +60,64 @@ namespace predabst {
 
     typedef enum { reached_query, not_dwf } counterexample_kind;
 
+    struct core_stats {
+        // Statistics about rule pre-processing.
+        unsigned m_num_head_predicates;
+        unsigned m_num_body_predicates;
+        unsigned m_num_true_predicates;
+        unsigned m_num_false_predicates;
+        unsigned m_num_known_explicit_arguments;
+        unsigned m_num_rules_unsatisfiable;
+
+        // Statistics about find_solution.  Note that these are cumulative
+        // over all refinement iterations.
+        unsigned m_num_nodes_discovered;
+        unsigned m_num_nodes_suppressed; // discovered but not enqueued, because it implies an existing node
+        unsigned m_num_nodes_enqueued;
+        unsigned m_num_nodes_discarded; // enqueued but not dequeued, because it implies a subsequent node
+        unsigned m_num_nodes_dequeued;
+        unsigned m_num_frontier_nodes_added;
+        unsigned m_num_frontier_nodes_removed;
+        unsigned m_num_body_checks_sat;
+        unsigned m_num_body_checks_unsat;
+        unsigned m_num_head_checks_sat;
+        unsigned m_num_head_checks_unsat;
+        unsigned m_num_head_evals;
+        unsigned m_num_well_founded_nodes;
+
+        core_stats() { reset(); }
+        void reset() { memset(this, 0, sizeof(*this)); }
+
+        void update(statistics& st) {
+#define UPDATE_STAT(NAME) st.update(#NAME, m_ ## NAME)
+            UPDATE_STAT(num_head_predicates);
+            UPDATE_STAT(num_body_predicates);
+            UPDATE_STAT(num_true_predicates);
+            UPDATE_STAT(num_false_predicates);
+            UPDATE_STAT(num_known_explicit_arguments);
+            UPDATE_STAT(num_rules_unsatisfiable);
+            UPDATE_STAT(num_nodes_discovered);
+            UPDATE_STAT(num_nodes_suppressed);
+            UPDATE_STAT(num_nodes_enqueued);
+            UPDATE_STAT(num_nodes_discarded);
+            UPDATE_STAT(num_nodes_dequeued);
+            UPDATE_STAT(num_frontier_nodes_added);
+            UPDATE_STAT(num_frontier_nodes_removed);
+            UPDATE_STAT(num_body_checks_sat);
+            UPDATE_STAT(num_body_checks_unsat);
+            UPDATE_STAT(num_head_checks_sat);
+            UPDATE_STAT(num_head_checks_unsat);
+            UPDATE_STAT(num_head_evals);
+            UPDATE_STAT(num_well_founded_nodes);
+        }
+    };
+
     class predabst_core {
         class imp;
         imp* m_imp;
 
     public:
-        struct stats {
-            // Statistics about rule pre-processing.
-            unsigned m_num_head_predicates;
-            unsigned m_num_body_predicates;
-            unsigned m_num_true_predicates;
-            unsigned m_num_false_predicates;
-            unsigned m_num_known_explicit_arguments;
-            unsigned m_num_rules_unsatisfiable;
-
-            // Statistics about find_solution.  Note that these are cumulative
-            // over all refinement iterations.
-            unsigned m_num_nodes_discovered;
-            unsigned m_num_nodes_suppressed; // discovered but not enqueued, because it implies an existing node
-            unsigned m_num_nodes_enqueued;
-            unsigned m_num_nodes_discarded; // enqueued but not dequeued, because it implies a subsequent node
-            unsigned m_num_nodes_dequeued;
-            unsigned m_num_frontier_nodes_added;
-            unsigned m_num_frontier_nodes_removed;
-            unsigned m_num_body_checks_sat;
-            unsigned m_num_body_checks_unsat;
-            unsigned m_num_head_checks_sat;
-            unsigned m_num_head_checks_unsat;
-            unsigned m_num_head_evals;
-            unsigned m_num_well_founded_nodes;
-
-            stats() { reset(); }
-            void reset() { memset(this, 0, sizeof(*this)); }
-
-            void update(statistics& st) {
-#define UPDATE_STAT(NAME) st.update(#NAME, m_ ## NAME)
-                UPDATE_STAT(num_head_predicates);
-                UPDATE_STAT(num_body_predicates);
-                UPDATE_STAT(num_true_predicates);
-                UPDATE_STAT(num_false_predicates);
-                UPDATE_STAT(num_known_explicit_arguments);
-                UPDATE_STAT(num_rules_unsatisfiable);
-                UPDATE_STAT(num_nodes_discovered);
-                UPDATE_STAT(num_nodes_suppressed);
-                UPDATE_STAT(num_nodes_enqueued);
-                UPDATE_STAT(num_nodes_discarded);
-                UPDATE_STAT(num_nodes_dequeued);
-                UPDATE_STAT(num_frontier_nodes_added);
-                UPDATE_STAT(num_frontier_nodes_removed);
-                UPDATE_STAT(num_body_checks_sat);
-                UPDATE_STAT(num_body_checks_unsat);
-                UPDATE_STAT(num_head_checks_sat);
-                UPDATE_STAT(num_head_checks_unsat);
-                UPDATE_STAT(num_head_evals);
-                UPDATE_STAT(num_well_founded_nodes);
-            }
-        };
-
-        predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m);
+        predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats);
         ~predabst_core();
         bool find_solution(unsigned refine_count);
         expr_ref get_model(symbol_info const* si) const;

@@ -78,7 +78,7 @@ namespace predabst {
     typedef vector<core_clause_solution> core_clause_solutions; // ditto
 
     class dl_interface::imp {
-        struct stats : private predabst_core::stats, private predabst_input::stats {
+        struct stats : public core_stats, public input_stats {
             // Overall statistics.
             unsigned m_num_refinement_iterations;
             unsigned m_num_template_instantiations;
@@ -91,8 +91,8 @@ namespace predabst {
 			void reset() { memset(this, 0, sizeof(*this)); }
 
             void update(statistics& st) {
-                predabst_core::stats::update(st);
-                predabst_input::stats::update(st);
+                core_stats::update(st);
+                input_stats::update(st);
 #define UPDATE_STAT(NAME) st.update(#NAME, m_ ## NAME)
                 UPDATE_STAT(num_refinement_iterations);
                 UPDATE_STAT(num_template_instantiations);
@@ -109,7 +109,7 @@ namespace predabst {
         model_ref                     m_model;
         mutable stats                 m_stats;       // statistics information specific to the predabst module.
         
-        scoped_ptr<predabst_input>    m_input;
+        scoped_ptr<input>             m_input;
         expr_ref_vector               m_template_params;
         expr_ref_vector               m_template_param_values;
         expr_ref_vector               m_template_constraint_vars;
@@ -145,7 +145,7 @@ namespace predabst {
         }
 
         lbool query(datalog::rule_set& rules) {
-            m_input = make_predabst_input(rules, m_fp_params);
+            m_input = make_input(rules, m_stats, m_fp_params);
 
             for (unsigned i = 0; i < m_input->m_template_vars.size(); ++i) {
                 m_template_params.push_back(m.mk_fresh_const("p", get_sort(m_input->m_template_vars.get(i))));
@@ -352,7 +352,7 @@ namespace predabst {
                     return l_true;
                 }
 
-                predabst_core core(m_input->m_symbols, m_input->m_rules, m_template_param_values, m_fp_params, m);
+                predabst_core core(m_input->m_symbols, m_input->m_rules, m_template_param_values, m_fp_params, m, m_stats);
 
                 // The only things that change on subsequent iterations of this loop are
                 // the predicate lists

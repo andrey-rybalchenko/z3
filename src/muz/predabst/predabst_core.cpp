@@ -79,17 +79,18 @@ namespace predabst {
         smt::kernel*								  m_solver;
         mutable simplifier							  m_simplifier;
         fixedpoint_params const&					  m_fp_params;
-        mutable stats								  m_stats;
+        mutable core_stats&          			      m_stats;
         subst_util									  m_subst;
         ast_manager&								  m;
 
     public:
-        imp(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m) :
+        imp(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats) :
             m_rules(rules),
             m_template_param_values(template_param_values),
             m_solver(NULL),
             m_simplifier(m),
             m_fp_params(fp_params),
+            m_stats(stats),
             m_subst(m),
             m(m) {
 
@@ -1228,8 +1229,8 @@ namespace predabst {
         }
     };
 
-    predabst_core::predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m) :
-        m_imp(alloc(imp, symbols, rules, template_param_values, fp_params, m)) {
+    predabst_core::predabst_core(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, ast_manager& m, core_stats& stats) :
+        m_imp(alloc(imp, symbols, rules, template_param_values, fp_params, m, stats)) {
     }
     
     predabst_core::~predabst_core() {
