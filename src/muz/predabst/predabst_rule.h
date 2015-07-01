@@ -23,8 +23,9 @@ Revision History:
 #include "dl_rule.h"
 #include "predabst_util.h"
 
-namespace datalog {
-    class rule_info;
+namespace predabst {
+	using datalog::rule;
+	class rule_info;
 
 	// Represents a predicate symbol, either templated or not.
     struct fdecl_info {

@@ -48,7 +48,7 @@ namespace datalog {
         case DDNF_ENGINE:
             return alloc(ddnf, *m_ctx);
         case PREDABST_ENGINE:
-            return alloc(predabst, *m_ctx);
+            return alloc(predabst::dl_interface, *m_ctx);
         case LAST_ENGINE:
             UNREACHABLE();
             return 0;

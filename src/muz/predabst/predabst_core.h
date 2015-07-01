@@ -23,7 +23,7 @@ Revision History:
 #include "ast.h"
 #include "fixedpoint_params.hpp"
 
-namespace datalog {
+namespace predabst {
     typedef vector<bool> cube_t;
 
     struct node_info;

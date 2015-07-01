@@ -35,8 +35,7 @@ Revision History:
 #include "iz3mgr.h"
 #include "iz3interp.h"
 
-namespace datalog {
-
+namespace predabst {
     struct name_app {
         unsigned        m_name;
         expr_ref_vector m_args;
@@ -78,7 +77,7 @@ namespace datalog {
     typedef vector<core_clause> core_clauses; // just a sequence; the index has no meaning
     typedef vector<core_clause_solution> core_clause_solutions; // ditto
 
-    class predabst::imp {
+    class dl_interface::imp {
         struct stats : private predabst_core::stats, private predabst_input::stats {
             // Overall statistics.
             unsigned m_num_refinement_iterations;
@@ -145,7 +144,7 @@ namespace datalog {
             reg_decl_plugins(m);
         }
 
-        lbool query(rule_set& rules) {
+        lbool query(datalog::rule_set& rules) {
             m_input = make_predabst_input(rules, m_fp_params);
 
             for (unsigned i = 0; i < m_input->m_template_vars.size(); ++i) {
@@ -473,12 +472,12 @@ namespace datalog {
             return m_subst.apply(exp, subst);
         }
 
-        bool check_solution(rule_set const& rules) const {
+        bool check_solution(datalog::rule_set const& rules) const {
             smt_params new_param;
             smt::kernel solver(m, new_param);
             set_logic(solver);
             for (unsigned i = 0; i < rules.get_num_rules(); ++i) {
-                rule* r = rules.get_rule(i);
+                datalog::rule* r = rules.get_rule(i);
                 unsigned usz = r->get_uninterpreted_tail_size();
                 unsigned tsz = r->get_tail_size();
                 expr_ref_vector body_exp_terms(m, tsz - usz, r->get_expr_tail() + usz);
@@ -1135,39 +1134,39 @@ namespace datalog {
         }
     };
 
-    predabst::predabst(context& ctx) :
+    dl_interface::dl_interface(datalog::context& ctx) :
         engine_base(ctx.get_manager(), "predabst"),
         m_ctx(ctx),
         m_imp(alloc(imp, ctx.get_manager(), ctx.get_params())) {
     }
-    predabst::~predabst() {
+    dl_interface::~dl_interface() {
         dealloc(m_imp);
     }
-    lbool predabst::query(expr* query) {
+    lbool dl_interface::query(expr* query) {
         m_ctx.ensure_opened();
-        rule_set& rules = m_ctx.get_rules();
+        datalog::rule_set& rules = m_ctx.get_rules();
         m_ctx.get_rule_manager().mk_query(query, rules);
         return m_imp->query(rules);
     }
-    void predabst::cancel() {
+    void dl_interface::cancel() {
         m_imp->cancel();
     }
-    void predabst::cleanup() {
+    void dl_interface::cleanup() {
         m_imp->cleanup();
     }
-    void predabst::reset_statistics() {
+    void dl_interface::reset_statistics() {
         m_imp->reset_statistics();
     }
-    void predabst::collect_statistics(statistics& st) const {
+    void dl_interface::collect_statistics(statistics& st) const {
         m_imp->collect_statistics(st);
     }
-    void predabst::display_certificate(std::ostream& out) const {
+    void dl_interface::display_certificate(std::ostream& out) const {
         m_imp->display_certificate(out);
     }
-    expr_ref predabst::get_answer() {
+    expr_ref dl_interface::get_answer() {
         return m_imp->get_answer();
     }
-    model_ref predabst::get_model() {
+    model_ref dl_interface::get_model() {
         return m_imp->get_model();
     }
 };

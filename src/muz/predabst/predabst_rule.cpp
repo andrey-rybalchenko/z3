@@ -19,7 +19,7 @@ Revision History:
 #include "predabst_rule.h"
 #include "predabst_util.h"
 
-namespace datalog {
+namespace predabst {
     expr_ref_vector rule_info::get_abstracted_args() const {
         if (get_decl()) {
             expr_ref_vector args(m);
@@ -77,6 +77,6 @@ namespace datalog {
 	}
 
     used_vars rule_info::get_used_vars() const {
-        return ::get_used_vars(m_rule);
+        return predabst::get_used_vars(m_rule);
     }
 }

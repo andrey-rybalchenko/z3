@@ -22,7 +22,9 @@ Revision History:
 #include "dl_rule_set.h"
 #include "fixedpoint_params.hpp"
 
-namespace datalog {
+namespace predabst {
+	using datalog::to_string;
+
     static void failwith(std::string msg) {
         STRACE("predabst", tout << "Malformed input: " << msg << "\n";);
         throw default_exception(msg);
@@ -55,7 +57,7 @@ namespace datalog {
             m_fp_params(fp_params) {
         }
 
-        void convert_input(rule_set& rules, predabst_input* input) {
+        void convert_input(datalog::rule_set& rules, predabst_input* input) {
             m_input = input;
 
             find_all_symbols(rules);
@@ -224,7 +226,7 @@ namespace datalog {
                 !is_predicate_list(fdecl);
         }
 
-        void find_all_symbols(rule_set const& rules) {
+        void find_all_symbols(datalog::rule_set const& rules) {
             for (unsigned i = 0; i < rules.get_num_rules(); ++i) {
                 rule* r = rules.get_rule(i);
                 func_decl* head_decl = r->get_decl();
@@ -271,7 +273,7 @@ namespace datalog {
             }
         }
 
-        void process_symbol(rule_set const& rules, func_decl *fdecl) {
+        void process_symbol(datalog::rule_set const& rules, func_decl *fdecl) {
             CASSERT("predabst", is_regular_predicate(fdecl));
             CASSERT("predabst", fdecl->get_range() == m.mk_bool_sort());
             if (rules.is_output_predicate(fdecl)) {
@@ -305,7 +307,7 @@ namespace datalog {
             return startswith(fdecl->get_name(), "__dwf__");
         }
 
-        void process_special_rules(rule_set& rules, bool(*p)(func_decl const*), void (builder::*f)(rule const*)) {
+        void process_special_rules(datalog::rule_set& rules, bool(*p)(func_decl const*), void (builder::*f)(rule const*)) {
             ptr_vector<rule> to_delete;
             for (unsigned i = 0; i < rules.get_num_rules(); ++i) {
                 rule* r = rules.get_rule(i);
@@ -623,7 +625,7 @@ namespace datalog {
         }
     };
 
-    predabst_input* make_predabst_input(rule_set& rules, fixedpoint_params const& fp_params) {
+    predabst_input* make_predabst_input(datalog::rule_set& rules, fixedpoint_params const& fp_params) {
         predabst_input* input = alloc(predabst_input, rules.get_manager());
         try {
             builder b(rules.get_manager(), fp_params);

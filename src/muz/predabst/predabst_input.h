@@ -23,7 +23,7 @@ Revision History:
 #include "ast.h"
 #include "fixedpoint_params.hpp"
 
-namespace datalog {
+namespace predabst {
     struct predabst_input {
         vector<symbol_info*>   m_symbols;
         vector<template_info*> m_templates;
@@ -73,7 +73,7 @@ namespace datalog {
         };
     };
 
-    predabst_input* make_predabst_input(rule_set& rules, fixedpoint_params const& fp_params);
+    predabst_input* make_predabst_input(datalog::rule_set& rules, fixedpoint_params const& fp_params);
 }
 
 #endif /* _PREDABST_INPUT_H */

@@ -30,7 +30,7 @@ Revision History:
 #include <map>
 #include <algorithm>
 
-namespace datalog {
+namespace predabst {
     class scoped_push {
         smt::kernel& s;
     public:

@@ -24,16 +24,14 @@ Revision History:
 #include "statistics.h"
 #include "dl_engine_base.h"
 
-namespace datalog {
-    class context;
-
-    class predabst : public datalog::engine_base {
+namespace predabst {
+    class dl_interface : public datalog::engine_base {
         class imp;
-        context& m_ctx;
-        imp*     m_imp;
+        datalog::context& m_ctx;
+        imp*              m_imp;
     public:
-        predabst(context& ctx);
-        ~predabst();
+        dl_interface(datalog::context& ctx);
+        ~dl_interface();
         virtual lbool query(expr* query);
         virtual void cancel();
         virtual void cleanup();
@@ -44,8 +42,5 @@ namespace datalog {
         virtual model_ref get_model();
     };
 };
-
-template<class T>
-inline std::ostream& operator<<(std::ostream&, const vector<T>&);
 
 #endif /* _PREDABST_CONTEXT_H_ */
