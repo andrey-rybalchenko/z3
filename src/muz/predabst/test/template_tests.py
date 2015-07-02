@@ -151,6 +151,21 @@ unknown_tests = [
 (declare-fun __temp__extra__ (Int Int Int) Bool)
 (assert (forall ((a Int) (b Int) (c Int)) (=> (and (> a 0) (> b 0) (> c 0) (= (+ (* a a) (* b b)) (* c c))) (__temp__extra__ a b c))))""",
      "(underlying-solver (incomplete (theory arithmetic)))"),
+
+    # Template refinement fails because Farkas is incomplete on integers.
+    # The constraints are equivalent to:
+    #   x >= 1/2
+    #   x <= 1/2 + 1/a
+    # The problem is satisfiable with a > 2.
+    ("refine-farkas-incomplete",
+     """
+(declare-fun p (Int) Bool)
+(declare-fun __temp__extra__ (Int) Bool)
+(declare-fun __temp__p (Int Int) Bool)
+(assert (forall ((x Int)) (=> (>= (* 2 x) 1) (not (p x)))))
+(assert (forall ((a Int)) (=> (> a 0) (__temp__extra__ a))))
+(assert (forall ((x Int) (a Int)) (=> (<= (* 2 a x) (+ 2 a)) (__temp__p x a))))""",
+     "incomplete"),
 ]
 
 template_tests = (sat_tests, unsat_tests, unknown_tests)

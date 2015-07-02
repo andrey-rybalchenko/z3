@@ -836,11 +836,18 @@ unknown_tests = [
      "(underlying-solver (incomplete (theory arithmetic)))"),
 
     # Predicate refinement fails because Farkas is incomplete on integers.
-    ("refine-farkas-incomplete",
+    ("refine-farkas-incomplete-1",
+     """
+(declare-fun p (Int) Bool)
+(assert (forall ((x Int)) (=> (<= (* 2 x) 1) (p x))))
+(assert (forall ((x Int)) (=> (>= (* 3 x) 1) (not (p x)))))""",
+     "incomplete"),
+
+    ("refine-farkas-incomplete-2",
      """
 (declare-fun p (Int Int) Bool)
-(assert (forall ((x Int) (y Int)) (=> (and (>= (* 2 x) 1) (>= (* 2 y) 1)) (p x y))))
-(assert (forall ((x Int) (y Int)) (=> (<= (+ (* 2 x) (* 2 y)) 3) (not (p x y)))))""",
+(assert (forall ((x Int) (y Int)) (=> (and (<= (* 2 x) 1) (<= (* 2 y) 1)) (p x y))))
+(assert (forall ((x Int) (y Int)) (=> (>= (* 3 (+ x y)) 1) (not (p x y)))))""",
      "incomplete"),
 
     # Predicate refinement (>>> or determination of reachability without abstraction?) fails due to a non-linear expression.
