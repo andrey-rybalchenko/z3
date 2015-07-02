@@ -37,6 +37,249 @@ def make_pred_refine_test(name, arity, pred, modelPred, argType="Int"):
     else:
         return ("refine-pred-%s" % name, code, "incomplete")
 
+def set_option(option, value, prefix):
+    def f(sat_test):
+        (name, code, model) = sat_test
+        name = prefix + "-" + name
+        code = ("(set-option :%s %s)\n" % (option, value)) + code
+        return (name, code, model)
+    return f
+
+infer_tests = [
+    # The node graph forms a linear sequence.
+    ("infer-constants-seq",
+     """
+(declare-fun p () Bool)
+(declare-fun q () Bool)
+(declare-fun r () Bool)
+(declare-fun s () Bool)
+(assert p)
+(assert (=> p q))
+(assert (=> q r))
+(assert (not s))""",
+     """
+(define-fun p () Bool true)
+(define-fun q () Bool true)
+(define-fun r () Bool true)
+(define-fun s () Bool false)"""),
+
+    # The node graph forms a tree; multiple rules use a single reachable
+    # predicate symbol.
+    ("infer-constants-tree-out",
+     """
+(declare-fun p () Bool)
+(declare-fun q () Bool)
+(declare-fun r () Bool)
+(declare-fun s () Bool)
+(assert p)
+(assert (=> p q))
+(assert (=> p r))
+(assert (not s))""",
+     """
+(define-fun p () Bool true)
+(define-fun q () Bool true)
+(define-fun r () Bool true)
+(define-fun s () Bool false)"""),
+
+    # The node graph forms a tree; a single rule uses multiple reachable
+    # predicate symbols.
+    ("infer-constants-tree-in",
+     """
+(declare-fun p () Bool)
+(declare-fun q () Bool)
+(declare-fun r () Bool)
+(declare-fun s () Bool)
+(assert p)
+(assert q)
+(assert (=> (and p q) r))
+(assert (not s))""",
+     """
+(define-fun p () Bool true)
+(define-fun q () Bool true)
+(define-fun r () Bool true)
+(define-fun s () Bool false)"""),
+
+    # A rule uses one reachable predicate symbol and one unreachable predicate
+    # symbol.
+    ("infer-constants-unreach",
+     """
+(declare-fun p () Bool)
+(declare-fun q () Bool)
+(declare-fun r () Bool)
+(declare-fun s () Bool)
+(assert p)
+(assert (=> (and p q) r))
+(assert (not s))""",
+     """
+(define-fun p () Bool true)
+(define-fun r () Bool false)
+(define-fun q () Bool false)
+(define-fun s () Bool false)"""),
+
+    # A recursive predicate symbol, but with a finite set of true values.
+    ("infer-discrete",
+     """
+(declare-fun p (Int) Bool)
+(declare-fun __pred__p (Int) Bool)
+(assert (p 0))
+(assert (=> (p 0) (p 2)))
+(assert (=> (p 2) (p 4)))
+(assert (forall ((x Int)) (=> (and (= x 0) (= x 1) (= x 2) (= x 3) (= x 4)) (__pred__p x))))""",
+     """
+(define-fun p ((x!1 Int)) Bool (or (= x!1 0) (= x!1 2) (= x!1 4)))"""),
+
+    # A recursive predicate symbol, with an infinite set of true values
+    # summarized by a > predicate.
+    ("infer-infinite",
+     """
+(declare-fun p (Int) Bool)
+(declare-fun __pred__p (Int) Bool)
+(assert (p 0))
+(assert (forall ((x Int)) (=> (p x) (p (+ x 1)))))
+(assert (forall ((x Int)) (=> (and (= x 0) (> x 0)) (__pred__p x))))""",
+     """
+(define-fun p ((x!1 Int)) Bool (or (= x!1 0) (> x!1 0)))"""),
+
+    # A rule with multiple uninterpreted body predicates (actually just a single
+    # predicate, but appearing multiple times), with multiple possible parent
+    # nodes for each body predicate.
+    ("infer-multiple-parents",
+     """
+(declare-fun p (Int) Bool)
+(declare-fun __pred__p (Int) Bool)
+(assert (p 4))
+(assert (p 5))
+(assert (forall ((a Int) (b Int) (c Int)) (=> (and (p a) (p b) (p c) (distinct a b)) (p (+ a (+ b c))))))
+(assert (forall ((x Int)) (=> (and (= x 4) (= x 5) (= x 13) (= x 14) (= x 21) (>= x 22)) (__pred__p x))))""",
+     """
+(define-fun p ((x!1 Int)) Bool (or (= x!1 4) (= x!1 5) (= x!1 13) (= x!1 14) (= x!1 21) (>= x!1 22)))"""),
+
+    # Multiple rules that generate cubes that subsume one another, at different
+    # depths of the search space.
+    ("infer-overlapping-preds-1",
+     """
+(declare-fun p1 () Bool)
+(declare-fun p2 () Bool)
+(declare-fun p3 () Bool)
+(declare-fun p4 () Bool)
+(declare-fun p (Int) Bool)
+(declare-fun __pred__p (Int) Bool)
+(assert p1)
+(assert (=> p1 p2))
+(assert (=> p2 p3))
+(assert (=> p3 p4))
+(assert (forall ((x Int)) (=> (and p1 (= x 1)) (p x))))
+(assert (forall ((x Int)) (=> (and p2 (= x 2)) (p x))))
+(assert (forall ((x Int)) (=> (and p3 (<= x 3)) (p x))))
+(assert (forall ((x Int)) (=> (and p4 (<= x 4)) (p x))))
+(assert (forall ((x Int)) (=> (and (= x 1) (= x 2) (<= x 3) (<= x 4)) (__pred__p x))))""",
+     """
+(define-fun p1 () Bool true)
+(define-fun p2 () Bool true)
+(define-fun p3 () Bool true)
+(define-fun p4 () Bool true)
+(define-fun p ((x!1 Int)) Bool (<= x!1 4))"""),
+
+    # As above, but with the cubes generated in the opposite order.
+    ("infer-overlapping-preds-2",
+     """
+(declare-fun p1 () Bool)
+(declare-fun p2 () Bool)
+(declare-fun p3 () Bool)
+(declare-fun p4 () Bool)
+(declare-fun p (Int) Bool)
+(declare-fun __pred__p (Int) Bool)
+(assert p1)
+(assert (=> p1 p2))
+(assert (=> p2 p3))
+(assert (=> p3 p4))
+(assert (forall ((x Int)) (=> (and p1 (<= x 4)) (p x))))
+(assert (forall ((x Int)) (=> (and p2 (<= x 3)) (p x))))
+(assert (forall ((x Int)) (=> (and p3 (= x 2)) (p x))))
+(assert (forall ((x Int)) (=> (and p4 (= x 1)) (p x))))
+(assert (forall ((x Int)) (=> (and (= x 1) (= x 2) (<= x 3) (<= x 4)) (__pred__p x))))""",
+     """
+(define-fun p1 () Bool true)
+(define-fun p2 () Bool true)
+(define-fun p3 () Bool true)
+(define-fun p4 () Bool true)
+(define-fun p ((x!1 Int)) Bool (<= x!1 4))"""),
+
+    # Inference performed on predicates with non-integer arguments.
+    ("infer-non-integers",
+     """
+(declare-fun p (Bool Real) Bool)
+(declare-fun __pred__p (Bool Real) Bool)
+(assert (p true 0.0))
+(assert (forall ((y Real)) (=> (p true y) (p false (- 1.0 y)))))
+(assert (forall ((x Bool) (y Real)) (=> (and x (not x) (<= y 0.0) (>= y 1.0)) (__pred__p x y))))""",
+     """
+(define-fun p ((x!1 Bool) (x!2 Real)) Bool (or (and (<= x!2 0.0) x!1) (and (not x!1) (>= x!2 1.0))))"""),
+
+    # >>>
+    ("infer-exp-eval",
+     """
+(declare-fun p (Int Int) Bool)
+(declare-fun __expargs__p (Int Int) Bool)
+(declare-fun __exparg__ (Int) Bool)
+(assert (forall ((x Int) (y Int)) (=> (= x 0) (p x y))))
+(assert (forall ((x Int) (y Int)) (=> (= x 1) (not (p x y)))))
+(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
+     """
+(define-fun p ((x!1 Int) (x!2 Int)) Bool (= x!1 0))"""),
+
+    # >>>
+    ("infer-exp-eval-literal-head",
+     """
+(declare-fun p (Int Int) Bool)
+(declare-fun __expargs__p (Int Int) Bool)
+(declare-fun __exparg__ (Int) Bool)
+(assert (forall ((y Int)) (p 0 y)))
+(assert (forall ((x Int) (y Int)) (=> (and (= x 0) (p x y)) (p 1 y))))
+(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
+     """
+(define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1)))"""),
+
+    # >>>
+    ("infer-exp-eval-literal-body",
+     """
+(declare-fun p (Int Int) Bool)
+(declare-fun __expargs__p (Int Int) Bool)
+(declare-fun __exparg__ (Int) Bool)
+(assert (forall ((x Int) (y Int)) (=> (= x 0) (p x y))))
+(assert (forall ((x Int) (y Int)) (=> (and (= x 1) (p 0 y)) (p x y))))
+(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
+     """
+(define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1)))"""),
+
+    # >>> Important because head argument is not known in advance.
+    ("infer-exp-eval-iterate",
+     """
+(declare-fun p (Int Int) Bool)
+(declare-fun __expargs__p (Int Int) Bool)
+(declare-fun __exparg__ (Int) Bool)
+(assert (forall ((y Int)) (p 0 y)))
+(assert (forall ((x Int) (y Int)) (=> (and (< x 2) (p x y)) (p (+ x 1) y))))
+(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
+     """
+(define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1) (= x!1 2)))"""),
+
+    # Inference performed on predicates with non-integer explicit arguments.
+    # >>> why is only one of them explicit?
+    ("infer-exp-eval-non-integers",
+     """
+(declare-fun p (Bool Real) Bool)
+(declare-fun __expargs__p (Bool Real) Bool)
+(declare-fun __exparg__ (Real) Bool)
+(declare-fun __pred__p (Bool Real) Bool)
+(assert (p true 0.0))
+(assert (forall ((y Real)) (=> (p true y) (p false (- 1.0 y)))))
+(assert (forall ((x Bool) (y Real)) (=> (__exparg__ y) (__expargs__p x y))))
+(assert (forall ((x Bool) (y Real)) (=> (and x (not x)) (__pred__p x y))))""",
+     """
+(define-fun p ((x!1 Bool) (x!2 Real)) Bool (or (and (= x!2 0.0) x!1) (and (= x!2 1.0) (not x!1))))"""),
+]
+
 sat_tests = [
     ("empty", # >>> check that this goes to predabst
      "",
@@ -277,239 +520,6 @@ sat_tests = [
      """
 (define-fun p ((x!1 Bool) (x!2 Real)) Bool (or (and (= x!1 true) (= x!2 0.0)) (and (= x!1 false) (= x!2 1.0))))"""),
 
-    # The node graph forms a linear sequence.
-    ("infer-constants-seq",
-     """
-(declare-fun p () Bool)
-(declare-fun q () Bool)
-(declare-fun r () Bool)
-(declare-fun s () Bool)
-(assert p)
-(assert (=> p q))
-(assert (=> q r))
-(assert (not s))""",
-     """
-(define-fun p () Bool true)
-(define-fun q () Bool true)
-(define-fun r () Bool true)
-(define-fun s () Bool false)"""),
-
-    # The node graph forms a tree; multiple rules use a single reachable
-    # predicate symbol.
-    ("infer-constants-tree-out",
-     """
-(declare-fun p () Bool)
-(declare-fun q () Bool)
-(declare-fun r () Bool)
-(declare-fun s () Bool)
-(assert p)
-(assert (=> p q))
-(assert (=> p r))
-(assert (not s))""",
-     """
-(define-fun p () Bool true)
-(define-fun q () Bool true)
-(define-fun r () Bool true)
-(define-fun s () Bool false)"""),
-
-    # The node graph forms a tree; a single rule uses multiple reachable
-    # predicate symbols.
-    ("infer-constants-tree-in",
-     """
-(declare-fun p () Bool)
-(declare-fun q () Bool)
-(declare-fun r () Bool)
-(declare-fun s () Bool)
-(assert p)
-(assert q)
-(assert (=> (and p q) r))
-(assert (not s))""",
-     """
-(define-fun p () Bool true)
-(define-fun q () Bool true)
-(define-fun r () Bool true)
-(define-fun s () Bool false)"""),
-
-    # A rule uses one reachable predicate symbol and one unreachable predicate
-    # symbol.
-    ("infer-constants-unreach",
-     """
-(declare-fun p () Bool)
-(declare-fun q () Bool)
-(declare-fun r () Bool)
-(declare-fun s () Bool)
-(assert p)
-(assert (=> (and p q) r))
-(assert (not s))""",
-     """
-(define-fun p () Bool true)
-(define-fun r () Bool false)
-(define-fun q () Bool false)
-(define-fun s () Bool false)"""),
-
-    # A recursive predicate symbol, but with a finite set of true values.
-    ("infer-discrete",
-     """
-(declare-fun p (Int) Bool)
-(declare-fun __pred__p (Int) Bool)
-(assert (p 0))
-(assert (=> (p 0) (p 2)))
-(assert (=> (p 2) (p 4)))
-(assert (forall ((x Int)) (=> (and (= x 0) (= x 1) (= x 2) (= x 3) (= x 4)) (__pred__p x))))""",
-     """
-(define-fun p ((x!1 Int)) Bool (or (= x!1 0) (= x!1 2) (= x!1 4)))"""),
-
-    # A recursive predicate symbol, with an infinite set of true values
-    # summarized by a > predicate.
-    ("infer-infinite",
-     """
-(declare-fun p (Int) Bool)
-(declare-fun __pred__p (Int) Bool)
-(assert (p 0))
-(assert (forall ((x Int)) (=> (p x) (p (+ x 1)))))
-(assert (forall ((x Int)) (=> (and (= x 0) (> x 0)) (__pred__p x))))""",
-     """
-(define-fun p ((x!1 Int)) Bool (or (= x!1 0) (> x!1 0)))"""),
-
-    # A rule with multiple uninterpreted body predicates (actually just a single
-    # predicate, but appearing multiple times), with multiple possible parent
-    # nodes for each body predicate.
-    ("infer-multiple-parents",
-     """
-(declare-fun p (Int) Bool)
-(declare-fun __pred__p (Int) Bool)
-(assert (p 4))
-(assert (p 5))
-(assert (forall ((a Int) (b Int) (c Int)) (=> (and (p a) (p b) (p c) (distinct a b)) (p (+ a (+ b c))))))
-(assert (forall ((x Int)) (=> (and (= x 4) (= x 5) (= x 13) (= x 14) (= x 21) (>= x 22)) (__pred__p x))))""",
-     """
-(define-fun p ((x!1 Int)) Bool (or (= x!1 4) (= x!1 5) (= x!1 13) (= x!1 14) (= x!1 21) (>= x!1 22)))"""),
-
-    # Multiple rules that generate cubes that subsume one another, at different
-    # depths of the search space.
-    ("infer-overlapping-preds-1",
-     """
-(declare-fun p1 () Bool)
-(declare-fun p2 () Bool)
-(declare-fun p3 () Bool)
-(declare-fun p4 () Bool)
-(declare-fun p (Int) Bool)
-(declare-fun __pred__p (Int) Bool)
-(assert p1)
-(assert (=> p1 p2))
-(assert (=> p2 p3))
-(assert (=> p3 p4))
-(assert (forall ((x Int)) (=> (and p1 (= x 1)) (p x))))
-(assert (forall ((x Int)) (=> (and p2 (= x 2)) (p x))))
-(assert (forall ((x Int)) (=> (and p3 (<= x 3)) (p x))))
-(assert (forall ((x Int)) (=> (and p4 (<= x 4)) (p x))))
-(assert (forall ((x Int)) (=> (and (= x 1) (= x 2) (<= x 3) (<= x 4)) (__pred__p x))))""",
-     """
-(define-fun p1 () Bool true)
-(define-fun p2 () Bool true)
-(define-fun p3 () Bool true)
-(define-fun p4 () Bool true)
-(define-fun p ((x!1 Int)) Bool (<= x!1 4))"""),
-
-    # As above, but with the cubes generated in the opposite order.
-    ("infer-overlapping-preds-2",
-     """
-(declare-fun p1 () Bool)
-(declare-fun p2 () Bool)
-(declare-fun p3 () Bool)
-(declare-fun p4 () Bool)
-(declare-fun p (Int) Bool)
-(declare-fun __pred__p (Int) Bool)
-(assert p1)
-(assert (=> p1 p2))
-(assert (=> p2 p3))
-(assert (=> p3 p4))
-(assert (forall ((x Int)) (=> (and p1 (<= x 4)) (p x))))
-(assert (forall ((x Int)) (=> (and p2 (<= x 3)) (p x))))
-(assert (forall ((x Int)) (=> (and p3 (= x 2)) (p x))))
-(assert (forall ((x Int)) (=> (and p4 (= x 1)) (p x))))
-(assert (forall ((x Int)) (=> (and (= x 1) (= x 2) (<= x 3) (<= x 4)) (__pred__p x))))""",
-     """
-(define-fun p1 () Bool true)
-(define-fun p2 () Bool true)
-(define-fun p3 () Bool true)
-(define-fun p4 () Bool true)
-(define-fun p ((x!1 Int)) Bool (<= x!1 4))"""),
-
-    # Inference performed on predicates with non-integer arguments.
-    ("infer-non-integers",
-     """
-(declare-fun p (Bool Real) Bool)
-(declare-fun __pred__p (Bool Real) Bool)
-(assert (p true 0.0))
-(assert (forall ((y Real)) (=> (p true y) (p false (- 1.0 y)))))
-(assert (forall ((x Bool) (y Real)) (=> (and x (not x) (<= y 0.0) (>= y 1.0)) (__pred__p x y))))""",
-     """
-(define-fun p ((x!1 Bool) (x!2 Real)) Bool (or (and (<= x!2 0.0) x!1) (and (not x!1) (>= x!2 1.0))))"""),
-
-    # >>>
-    ("infer-exp-eval",
-     """
-(declare-fun p (Int Int) Bool)
-(declare-fun __expargs__p (Int Int) Bool)
-(declare-fun __exparg__ (Int) Bool)
-(assert (forall ((x Int) (y Int)) (=> (= x 0) (p x y))))
-(assert (forall ((x Int) (y Int)) (=> (= x 1) (not (p x y)))))
-(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
-     """
-(define-fun p ((x!1 Int) (x!2 Int)) Bool (= x!1 0))"""),
-
-    # >>>
-    ("infer-exp-eval-literal-head",
-     """
-(declare-fun p (Int Int) Bool)
-(declare-fun __expargs__p (Int Int) Bool)
-(declare-fun __exparg__ (Int) Bool)
-(assert (forall ((y Int)) (p 0 y)))
-(assert (forall ((x Int) (y Int)) (=> (and (= x 0) (p x y)) (p 1 y))))
-(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
-     """
-(define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1)))"""),
-
-    # >>>
-    ("infer-exp-eval-literal-body",
-     """
-(declare-fun p (Int Int) Bool)
-(declare-fun __expargs__p (Int Int) Bool)
-(declare-fun __exparg__ (Int) Bool)
-(assert (forall ((x Int) (y Int)) (=> (= x 0) (p x y))))
-(assert (forall ((x Int) (y Int)) (=> (and (= x 1) (p 0 y)) (p x y))))
-(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
-     """
-(define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1)))"""),
-
-    # >>> Important because head argument is not known in advance.
-    ("infer-exp-eval-iterate",
-     """
-(declare-fun p (Int Int) Bool)
-(declare-fun __expargs__p (Int Int) Bool)
-(declare-fun __exparg__ (Int) Bool)
-(assert (forall ((y Int)) (p 0 y)))
-(assert (forall ((x Int) (y Int)) (=> (and (< x 2) (p x y)) (p (+ x 1) y))))
-(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
-     """
-(define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1) (= x!1 2)))"""),
-
-    # Inference performed on predicates with non-integer explicit arguments.
-    # >>> why is only one of them explicit?
-    ("infer-exp-eval-non-integers",
-     """
-(declare-fun p (Bool Real) Bool)
-(declare-fun __expargs__p (Bool Real) Bool)
-(declare-fun __exparg__ (Real) Bool)
-(declare-fun __pred__p (Bool Real) Bool)
-(assert (p true 0.0))
-(assert (forall ((y Real)) (=> (p true y) (p false (- 1.0 y)))))
-(assert (forall ((x Bool) (y Real)) (=> (__exparg__ y) (__expargs__p x y))))
-(assert (forall ((x Bool) (y Real)) (=> (and x (not x)) (__pred__p x y))))""",
-     """
-(define-fun p ((x!1 Bool) (x!2 Real)) Bool (or (and (= x!2 0.0) x!1) (and (= x!2 1.0) (not x!1))))"""),
-
     # One round of predicate refinement is necessary to generate the predicate
     # (x <= 0).
     ("refine-once",
@@ -682,7 +692,12 @@ sat_tests = [
 (define-fun p ((x!1 Int)) Bool (= x!1 0))
 (define-fun p ((x!1 Real)) Bool (= x!1 1.0))
 (define-fun p ((x!1 Int) (x!2 Int)) Bool (and (= x!1 2) (= x!2 3)))"""),
-]
+] + infer_tests \
+    + map(set_option("fixedpoint.predabst.solver-per-rule", "true", "solverperrule"), infer_tests) \
+    + map(set_option("fixedpoint.predabst.use-allsat", "true", "allsat"), infer_tests) \
+    + map(set_option("fixedpoint.predabst.summarize-cubes", "true", "summarizecubes"), infer_tests) \
+    + map(set_option("fixedpoint.predabst.use-head-assumptions", "true", "headassumptions"), infer_tests) \
+    + map(set_option("fixedpoint.predabst.use-body-assumptions", "true", "bodyassumptions"), infer_tests)
 
 unsat_tests = [
     ("empty", # >>> check that this goes to predabst

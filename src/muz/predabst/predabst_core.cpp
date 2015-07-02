@@ -31,10 +31,18 @@ Revision History:
 
 namespace predabst {
     class scoped_push {
-        smt::kernel& s;
+        smt::kernel* s;
     public:
-        scoped_push(smt::kernel& s) : s(s) { s.push(); }
-        ~scoped_push() { s.pop(1); }
+        scoped_push(smt::kernel* s) : s(s) {
+            if (s) {
+                s->push();
+            }
+        }
+        ~scoped_push() {
+            if (s) {
+                s->pop(1);
+            }
+        }
     };
 
     struct rule_instance_info {
@@ -299,7 +307,7 @@ namespace predabst {
 
         void maybe_make_false(expr_ref_vector& exprs, smt::kernel* solver) const {
             for (unsigned i = 0; i < exprs.size(); ++i) {
-                scoped_push _push(*solver);
+                scoped_push _push(solver);
                 solver->assert_expr(exprs.get(i));
                 if (check(solver) == l_false) {
                     exprs[i] = m.mk_false();
@@ -310,7 +318,7 @@ namespace predabst {
 
         void maybe_make_true(expr_ref_vector& exprs, smt::kernel* solver) const {
             for (unsigned i = 0; i < exprs.size(); ++i) {
-                scoped_push _push(*solver);
+                scoped_push _push(solver);
                 expr_ref e(m.mk_not(exprs.get(i)), m);
                 pre_simplify(e);
                 solver->assert_expr(e);
@@ -396,14 +404,8 @@ namespace predabst {
                     info->m_body_preds.push_back(expr_ref_vector(m));
                 }
 
-                if (m_fp_params.predabst_solver_per_rule()) {
-                    assert_exprs(*solver, info->m_body);
-                }
-
-                scoped_push _push1(*solver); // >>> unnecessary if solver_per_rule
-                if (!m_fp_params.predabst_solver_per_rule()) {
-                    assert_exprs(*solver, info->m_body);
-                }
+                scoped_push _push1(m_fp_params.predabst_solver_per_rule() ? NULL : solver);
+                assert_exprs(*solver, info->m_body);
 
                 lbool result = check(solver);
                 if (result == l_false) {
@@ -428,7 +430,7 @@ namespace predabst {
             STRACE("predabst", tout << "Instantiating predicates for rule " << ri << "\n";);
             rule_instance_info* info = m_rule_instances[ri];
 
-            scoped_push push(*solver_for(ri)); // >>> unnecessary if solver per rule
+            scoped_push push(m_fp_params.predabst_solver_per_rule() ? NULL : solver_for(ri));
             if (!m_fp_params.predabst_solver_per_rule()) {
                 assert_exprs(*solver_for(ri), info->m_body);
             }
@@ -655,8 +657,7 @@ namespace predabst {
 
             STRACE("predabst", tout << "Using candidate node set (" << all_nodes << ") with cubes (" << all_cubes << ")\n";); // "cubes" here are not useful if they're cv's
 
-            // This push is unnecessary if (solver_per_rule() && !use_allsat()).
-            scoped_push _push1(*solver_for(ri));
+            scoped_push _push1((m_fp_params.predabst_solver_per_rule() && !m_fp_params.predabst_use_allsat()) ? NULL : solver_for(ri));
 
             if (!m_fp_params.predabst_solver_per_rule()) {
                 assert_exprs(*solver_for(ri), info->m_body);
@@ -971,7 +972,7 @@ namespace predabst {
                 // Check that these explicit values are uniquely determined.  This
                 // check may fail if some arguments were incorrectly marked as
                 // explicit.
-                scoped_push _push(*solver_for(ri));
+                scoped_push _push(solver_for(ri));
                 expr_ref_vector exprs(m);
                 for (unsigned i = 0; i < info->m_head_explicit_args.size(); ++i) {
                     if (!info->m_head_known_args.get(i)) {
