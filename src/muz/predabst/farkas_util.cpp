@@ -608,12 +608,11 @@ namespace predabst {
 		model_ref modref;
 		solver.get_model(modref);
 		CASSERT("predabst", modref);
+        model_evaluator ev(*modref);
 		vector<lambda_info> lambdas = f_imp.get_lambdas();
 		CASSERT("predabst", lambdas.size() == inequalities.size());
 		for (unsigned i = 0; i < lambdas.size(); ++i) {
-			expr_ref e(m);
-			bool result = modref->eval(lambdas.get(i).m_lambda, e);
-			CASSERT("predabst", result);
+			expr_ref e = model_eval(lambdas.get(i).m_lambda, ev);
 			rational coeff;
 			bool is_int;
 			result = arith.is_numeral(e, coeff, is_int);
@@ -706,10 +705,10 @@ namespace predabst {
 		if (sol_bound && sol_decrease) {
 			model_ref modref;
 			solver.get_model(modref);
-			if (!(modref->eval(bound, *sol_bound) && modref->eval(decrease, *sol_decrease))) {
-				return false;
-			}
-
+            CASSERT("predabst", modref);
+            model_evaluator ev(*modref);
+            *sol_bound = model_eval(bound, ev);
+            *sol_decrease = model_eval(decrease, ev);
 			STRACE("predabst", tout << "Formula " << lhs << " is well-founded, with bound " << *sol_bound << "; decrease " << *sol_decrease << "\n";);
 		}
 		else {

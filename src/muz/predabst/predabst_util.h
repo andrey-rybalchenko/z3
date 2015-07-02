@@ -24,6 +24,7 @@ Revision History:
 #include "used_vars.h"
 #include "dl_rule.h"
 #include "smt_kernel.h"
+#include "model_evaluator.h"
 #include "var_subst.h"
 
 namespace predabst {
@@ -216,6 +217,9 @@ namespace predabst {
 
     // Asserts each of the expressions in exprs.
     void assert_exprs(smt::kernel& solver, expr_ref_vector const& exprs);
+
+    // Returns the result of evaluating e using ev.
+    expr_ref model_eval(expr_ref const& e, model_evaluator& ev, bool model_completion = false);
 
 	class subst_util {
 		ast_manager&      m;

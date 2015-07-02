@@ -37,11 +37,23 @@ def make_pred_refine_test(name, arity, pred, modelPred, argType="Int"):
     else:
         return ("refine-pred-%s" % name, code, "incomplete")
 
+def add_option(option, value, code):
+    return ("(set-option :fixedpoint.predabst.%s %s)\n" % (option, value)) + code
+
 def set_option(option, value, prefix):
     def f(sat_test):
         (name, code, model) = sat_test
         name = prefix + "-" + name
-        code = ("(set-option :%s %s)\n" % (option, value)) + code
+        code = add_option(option, value, code)
+        return (name, code, model)
+    return f
+
+def set_options(options, prefix):
+    def f(sat_test):
+        (name, code, model) = sat_test
+        name = prefix + "-" + name
+        for (option, value) in options:
+            code = add_option(option, value, code)
         return (name, code, model)
     return f
 
@@ -693,11 +705,12 @@ sat_tests = [
 (define-fun p ((x!1 Real)) Bool (= x!1 1.0))
 (define-fun p ((x!1 Int) (x!2 Int)) Bool (and (= x!1 2) (= x!2 3)))"""),
 ] + infer_tests \
-    + map(set_option("fixedpoint.predabst.solver-per-rule", "true", "solverperrule"), infer_tests) \
-    + map(set_option("fixedpoint.predabst.use-allsat", "true", "allsat"), infer_tests) \
-    + map(set_option("fixedpoint.predabst.summarize-cubes", "true", "summarizecubes"), infer_tests) \
-    + map(set_option("fixedpoint.predabst.use-head-assumptions", "true", "headassumptions"), infer_tests) \
-    + map(set_option("fixedpoint.predabst.use-body-assumptions", "true", "bodyassumptions"), infer_tests)
+    + map(set_option("solver-per-rule", "true", "solverperrule"), infer_tests) \
+    + map(set_option("use-allsat", "true", "allsat"), infer_tests) \
+    + map(set_option("summarize-cubes", "true", "summarizecubes"), infer_tests) \
+    + map(set_option("use-head-assumptions", "true", "headassumptions"), infer_tests) \
+    + map(set_options([("use-body-assumptions", "true"),
+                       ("summarize-cubes", "true")], "bodyassumptions"), infer_tests)
 
 unsat_tests = [
     ("empty", # >>> check that this goes to predabst

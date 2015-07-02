@@ -520,21 +520,14 @@ namespace predabst {
             return positions;
         }
 
-        bool model_eval_true(model_ref const& modref, expr_ref const& cube) const {
-            expr_ref val(m);
+        bool model_eval_true(model_evaluator& ev, expr_ref const& cube) const {
             if (m_fp_params.predabst_summarize_cubes()) { // >>> and not summarize_via_iff?
-                if (!modref->eval(cube, val)) {
-                    CASSERT("predabst", "Failed to evaluate!\n"); // >>>
-                    throw default_exception("failed to evaluate");
-                }
+                expr_ref val = model_eval(cube, ev);
                 CASSERT("predabst", m.is_true(val) || m.is_false(val) || val == cube);
                 return !m.is_false(val);
             }
             else {
-                if (!modref->eval(cube, val, true)) {
-                    CASSERT("predabst", "Failed to evaluate!\n"); // >>>
-                    throw default_exception("failed to evaluate");
-                }
+                expr_ref val = model_eval(cube, ev, true);
                 CASSERT("predabst", m.is_true(val) || m.is_false(val));
                 return m.is_true(val);
             }
@@ -719,8 +712,11 @@ namespace predabst {
 
                 while (check(solver_for(ri)) == l_true) {
                     model_ref modref;
+                    scoped_ptr<model_evaluator> ev;
                     if (all_combs > 1) {
                         solver_for(ri)->get_model(modref);
+                        CASSERT("predabst", modref);
+                        ev = alloc(model_evaluator, *modref);
                     }
 
                     // Build the sets of satisfiable nodes/cubes for each position.
@@ -738,7 +734,7 @@ namespace predabst {
                             expr_ref cube(mk_conj(pos_cubes[j]), m);
                             // No need to evaluate P with respect to the model when we know that the model already satisfies P.
                             // >>> This optimization is probably not worth anything if the "cubes" here were guard_vars.
-                            if ((m_fp_params.predabst_skip_singleton_model_eval() && (pos_cubes.size() == 1)) || model_eval_true(modref, cube)) {
+                            if ((m_fp_params.predabst_skip_singleton_model_eval() && (pos_cubes.size() == 1)) || model_eval_true(*ev, cube)) {
                                 sat_pos_nodes.insert(node);
                                 sat_pos_cubes.push_back(pos_cubes[j]);
                             }
@@ -947,22 +943,12 @@ namespace predabst {
                 solver_for(ri)->get_model(modref);
                 CASSERT("predabst", modref);
                 model_evaluator ev(*modref);
-                ev.set_model_completion(true);
                 for (unsigned i = 0; i < info->m_head_explicit_args.size(); ++i) {
                     if (m_fp_params.predabst_skip_known_head_values() && info->m_head_known_args.get(i)) {
                         values.push_back(info->m_head_explicit_args.get(i));
                     }
                     else {
-                        expr_ref val(m);
-                        try {
-                            ev(info->m_head_explicit_args.get(i), val);
-                        }
-                        catch (model_evaluator_exception& ex) {
-                            (void)ex;
-                            STRACE("predabst", tout << "Failed to evaluate: " << ex.msg() << "\n";); // >>>
-                            throw default_exception("failed to evaluate");
-                        }
-                        values.push_back(val);
+                        values.push_back(model_eval(expr_ref(info->m_head_explicit_args.get(i), m), ev, true));
                         m_stats.m_num_head_evals++;
                     }
                 }

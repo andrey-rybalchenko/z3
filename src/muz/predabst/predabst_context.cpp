@@ -1024,14 +1024,13 @@ namespace predabst {
             }
             model_ref modref;
             solver.get_model(modref);
+            CASSERT("predabst", modref);
+            model_evaluator ev(*modref);
 
             m_template_param_values.reset();
             for (unsigned i = 0; i < m_template_params.size(); ++i) {
                 expr_ref param(m_template_params.get(i), m);
-                expr_ref param_value(m);
-                if (!modref->eval(param, param_value, true)) {
-                    return false;
-                }
+                expr_ref param_value = model_eval(param, ev, true);
                 STRACE("predabst", tout << "Instantiated template parameter " << param << " := " << param_value << "\n";);
                 m_template_param_values.push_back(param_value);
             }
