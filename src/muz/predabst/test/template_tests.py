@@ -153,10 +153,15 @@ unknown_tests = [
      "(underlying-solver (incomplete (theory arithmetic)))"),
 
     # Template refinement fails because Farkas is incomplete on integers.
+    #
     # The constraints are equivalent to:
     #   x >= 1/2
     #   x <= 1/2 + 1/a
-    # The problem is satisfiable with a > 2.
+    # and so in fact the problem is satisfiable with a > 2; predabst
+    # would be able to determine this if the constraint (> a 0) were
+    # replaced with (> a 2), in which case it would choose a
+    # suitable value of a the first time around and template refinement
+    # would be avoided.
     ("refine-farkas-incomplete",
      """
 (declare-fun p (Int) Bool)
@@ -165,6 +170,40 @@ unknown_tests = [
 (assert (forall ((x Int)) (=> (>= (* 2 x) 1) (not (p x)))))
 (assert (forall ((a Int)) (=> (> a 0) (__temp__extra__ a))))
 (assert (forall ((x Int) (a Int)) (=> (<= (* 2 a x) (+ 2 a)) (__temp__p x a))))""",
+     "incomplete"),
+
+    # Template refinement fails because we make the erroneous
+    # assumption that we can without loss of generality take the
+    # single bilinear lambda to be 1, which is not the case when the
+    # coefficients are integers.
+    #
+    # In fact, the problem is satisfiable with a > 1; predabst would
+    # be able to determine this if the constraint (>= (* 2 x) 0) were
+    # replaced with the equivalent constraint (>= x 0).
+    ("refine-farkas-single-bilinear-lambda-is-1",
+     """
+(declare-fun p (Int) Bool)
+(declare-fun __temp__extra__ (Int) Bool)
+(declare-fun __temp__p (Int Int) Bool)
+(assert (forall ((x Int)) (=> (>= (* 2 x) 0) (not (p x)))))
+(assert (forall ((a Int)) (__temp__extra__ a)))
+(assert (forall ((x Int) (a Int)) (=> (<= x a) (__temp__p x a))))""",
+     "incomplete"),
+
+    # Template refinement fails because we limit the magnitude of
+    # bilinear lambdas.
+    #
+    # In fact, the problem is satisfiable with a > 1; predabst would
+    # be able to determine this if the constraint (>= (* 5 x) 0) were
+    # replaced with the equivalent constraint (>= (* 4 x) 0).
+    ("refine-farkas-multiple-bilinear-lambdas-limited",
+     """
+(declare-fun p (Int) Bool)
+(declare-fun __temp__extra__ (Int) Bool)
+(declare-fun __temp__p (Int Int) Bool)
+(assert (forall ((x Int)) (=> (>= (* 5 x) 0) (not (p x)))))
+(assert (forall ((a Int)) (__temp__extra__ a)))
+(assert (forall ((x Int) (a Int)) (=> (and (<= x a) (<= x (+ a 1))) (__temp__p x a))))""",
      "incomplete"),
 ]
 
