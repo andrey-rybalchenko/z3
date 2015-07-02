@@ -223,6 +223,27 @@ sat_tests = [
 (define-fun p ((x!1 Int)) Bool (<= x!1 0))
 (define-fun q ((x!1 Int)) Bool (= x!1 0))"""),
 
+    # p and q have an argument with the same name, but q also has another
+    # argument that is explicit; the predicate should be copied.
+    ("explicit-other-arg",
+     """
+(declare-fun p (Int) Bool)
+(declare-fun q (Int Int) Bool)
+(declare-fun __expargs__q (Int Int) Bool)
+(declare-fun __names__p (Int) Bool)
+(declare-fun __names__q (Int Int) Bool)
+(declare-fun __exparg__ (Int) Bool)
+(declare-fun __name__a (Int) Bool)
+(assert (forall ((x Int)) (=> (<= x 0) (p x))))
+(assert (forall ((x Int)) (=> (> x 0) (not (p x)))))
+(assert (forall ((y Int)) (=> (= y 0) (q 0 y))))
+(assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__q x y))))
+(assert (forall ((x Int)) (=> (__name__a x) (__names__p x))))
+(assert (forall ((x Int) (y Int)) (=> (__name__a y) (__names__q x y))))""",
+     """
+(define-fun p ((x!1 Int)) Bool (<= x!1 0))
+(define-fun q ((x!1 Int) (x!2 Int)) Bool (and (= x!1 0) (<= x!2 0)))"""),
+
     # Multiple predicates with the same name but different arity and/or argument
     # types should be allowed.
     ("preds-same-name",

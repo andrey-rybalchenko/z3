@@ -535,9 +535,13 @@ namespace predabst {
                 return 0;
             }
             else {
+                // Add the predicate p to symbol si.
                 unsigned new_preds_added = 1;
                 add_pred(si, pred);
                 m_stats.m_num_predicates_added++;
+
+                // Add the predicate p to all other symbols that have arguments of the same
+                // names as all the arguments of si that are involved in p.
                 if (m_fp_params.predabst_use_query_naming() && new_preds_added) {
                     var_ref_vector used_vars = to_vars(get_all_vars(pred));
                     func_decl_ref_vector used_var_names(m);
@@ -558,8 +562,14 @@ namespace predabst {
                         if (vector_subset(used_var_names, fi2->m_var_names)) {
                             var_ref_vector used_vars2(m);
                             for (unsigned j = 0; j < used_var_names.size(); ++j) {
-                                unsigned k = vector_find(fi2->m_var_names, used_var_names.get(j));
-                                used_vars2.push_back(fi2->m_abstracted_vars.get(k)); // >>> wrong!!!
+                                unsigned idx = vector_find(fi2->m_var_names, used_var_names.get(j));
+                                unsigned abs_idx = 0;
+                                for (unsigned k = 0; k < idx; ++k) {
+                                    if (fi2->m_arg_kinds[k] == symbol_info::abstracted_arg) {
+                                        ++abs_idx;
+                                    }
+                                }
+                                used_vars2.push_back(fi2->m_abstracted_vars.get(abs_idx));
                             }
                             new_preds_added++;
                             add_pred(fi2, m_subst.apply(pred, m_subst.build(used_vars, used_vars2)));
