@@ -906,7 +906,11 @@ namespace predabst {
             }
 
             vector<int64> assertion_coeffs;
-            get_farkas_coeffs(assertion_inequalities, assertion_coeffs, m_cancellation_manager);
+            bool result = get_farkas_coeffs(assertion_inequalities, assertion_coeffs, m_cancellation_manager);
+            if (!result) {
+                STRACE("predabst", tout << "Cannot solve clauses: Farkas is incomplete on integers\n";);
+                return core_clause_solutions();
+            }
             STRACE("predabst", {
                 tout << "Farkas coefficients are:\n";
                 for (unsigned i = 0; i < assertion_coeffs.size(); ++i) {

@@ -585,7 +585,7 @@ namespace predabst {
 		return true;
 	}
 
-	void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm) {
+	bool get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm) {
 		CASSERT("predabst", coeffs.empty());
 		CASSERT("predabst", !inequalities.empty());
 		ast_manager& m = inequalities[0].m;
@@ -601,7 +601,10 @@ namespace predabst {
 		expr_ref_vector constraints = f_imp.get_constraints();
         assert_exprs(solver, constraints);
         lbool lresult = cm.check(&solver);
-		CASSERT("predabst", lresult == l_true);
+        if (lresult != l_true) {
+            STRACE("predabst", tout << "Farkas cannot derive false from the supplied inequalities\n";);
+            return false;
+        }
 		model_ref modref;
 		solver.get_model(modref);
 		CASSERT("predabst", modref);
@@ -618,6 +621,7 @@ namespace predabst {
 			CASSERT("predabst", is_int);
 			coeffs.push_back(coeff.get_int64());
 		}
+        return true;
 	}
 
 	void well_founded_bound_and_decrease(expr_ref_vector const& vsws, expr_ref& bound, expr_ref& decrease) {

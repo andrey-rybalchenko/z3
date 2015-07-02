@@ -839,8 +839,8 @@ unknown_tests = [
     ("refine-farkas-incomplete",
      """
 (declare-fun p (Int Int) Bool)
-(assert (forall ((x Int) (y Int)) (=> (and (> x 0) (> y 0)) (p x y))))
-(assert (forall ((x Int) (y Int)) (=> (< (+ x y) 1) (not (p x y)))))""",
+(assert (forall ((x Int) (y Int)) (=> (and (>= (* 2 x) 1) (>= (* 2 y) 1)) (p x y))))
+(assert (forall ((x Int) (y Int)) (=> (<= (+ (* 2 x) (* 2 y)) 3) (not (p x y)))))""",
      "incomplete"),
 
     # Predicate refinement (>>> or determination of reachability without abstraction?) fails due to a non-linear expression.

@@ -82,7 +82,7 @@ namespace predabst {
 
 		friend std::ostream& operator<<(std::ostream& out, linear_inequality const& lineq);
 		friend class farkas_imp;
-		friend void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm);
+		friend bool get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm);
 	};
 
 	struct lambda_info {
@@ -99,7 +99,7 @@ namespace predabst {
 
 	bool mk_exists_forall_farkas(expr_ref const& fml, expr_ref_vector const& vars, expr_ref_vector& constraints, vector<lambda_info>& lambda_infos, cancellation_manager& cm, bool eliminate_unsat_disjuncts = false);
 
-	void get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm);
+	bool get_farkas_coeffs(vector<linear_inequality> const& inequalities, vector<int64>& coeffs, cancellation_manager& cm);
 
 	void well_founded_bound_and_decrease(expr_ref_vector const& vsws, expr_ref& bound, expr_ref& decrease);
 
