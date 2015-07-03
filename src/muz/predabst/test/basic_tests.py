@@ -12,9 +12,19 @@
 # infer:   rules have uninterpreted body (so the node graph has edges).
 # refine:  predicate refinement is necessary.
 
-# >>> for each of these, should also have the test where the predicate is supplied up-front.
-# >>> including when it won't be discovered by refinement.
 def make_pred_refine_test(name, arity, pred, modelPred, argType="Int"):
+    """Creates and returns a test case with a single predicate p of the given
+    arity, and a pair of rules:
+
+       phi(x) => p(x)
+       not(phi(x)) => not(p(x))
+
+    Refinement ought to discover phi(x) (or something equivalent to it) as a
+    predicate for p(x).
+
+    The argument pred is the function phi(x) in the form that it appears in the
+    rule definition, and the argument modelPred is phi(x) in the form that it
+    appears in the computed model."""
     def arg(i):
         return chr(ord("x") + i)
     types = " ".join([argType for i in range(arity)])
@@ -217,7 +227,7 @@ infer_tests = [
 (define-fun p4 () Bool true)
 (define-fun p ((x!1 Int)) Bool (<= x!1 4))"""),
 
-    # Inference performed on predicates with non-integer arguments.
+    # Inference performed on a predicate with non-integer arguments.
     ("infer-non-integers",
      """
 (declare-fun p (Bool Real) Bool)
@@ -228,19 +238,19 @@ infer_tests = [
      """
 (define-fun p ((x!1 Bool) (x!2 Real)) Bool (or (and (<= x!2 0.0) x!1) (and (not x!1) (>= x!2 1.0))))"""),
 
-    # >>>
+    # Inference performed on a predicate with an explicit argument.
     ("infer-exp-eval",
      """
 (declare-fun p (Int Int) Bool)
 (declare-fun __expargs__p (Int Int) Bool)
 (declare-fun __exparg__ (Int) Bool)
 (assert (forall ((x Int) (y Int)) (=> (= x 0) (p x y))))
-(assert (forall ((x Int) (y Int)) (=> (= x 1) (not (p x y)))))
+(assert (forall ((x0 Int) (x1 Int) (y Int)) (=> (and (= x0 0) (= x1 1) (p x0 y)) (not (p x1 y)))))
 (assert (forall ((x Int) (y Int)) (=> (__exparg__ x) (__expargs__p x y))))""",
      """
 (define-fun p ((x!1 Int) (x!2 Int)) Bool (= x!1 0))"""),
 
-    # >>>
+    # As above, but the head arguments are literals rather than variables.
     ("infer-exp-eval-literal-head",
      """
 (declare-fun p (Int Int) Bool)
@@ -252,7 +262,7 @@ infer_tests = [
      """
 (define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1)))"""),
 
-    # >>>
+    # As above, but the head arguments are literals rather than variables.
     ("infer-exp-eval-literal-body",
      """
 (declare-fun p (Int Int) Bool)
@@ -264,7 +274,8 @@ infer_tests = [
      """
 (define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1)))"""),
 
-    # >>> Important because head argument is not known in advance.
+    # A rule where the value of an explicit head argument depends on the value
+    # of explicit body arguments.
     ("infer-exp-eval-iterate",
      """
 (declare-fun p (Int Int) Bool)
@@ -276,24 +287,22 @@ infer_tests = [
      """
 (define-fun p ((x!1 Int) (x!2 Int)) Bool (or (= x!1 0) (= x!1 1) (= x!1 2)))"""),
 
-    # Inference performed on predicates with non-integer explicit arguments.
-    # >>> why is only one of them explicit?
+    # Inference performed on a predicate with non-integer explicit arguments.
     ("infer-exp-eval-non-integers",
      """
 (declare-fun p (Bool Real) Bool)
 (declare-fun __expargs__p (Bool Real) Bool)
+(declare-fun __exparg__ (Bool) Bool)
 (declare-fun __exparg__ (Real) Bool)
-(declare-fun __pred__p (Bool Real) Bool)
 (assert (p true 0.0))
 (assert (forall ((y Real)) (=> (p true y) (p false (- 1.0 y)))))
-(assert (forall ((x Bool) (y Real)) (=> (__exparg__ y) (__expargs__p x y))))
-(assert (forall ((x Bool) (y Real)) (=> (and x (not x)) (__pred__p x y))))""",
+(assert (forall ((x Bool) (y Real)) (=> (and (__exparg__ x) (__exparg__ y)) (__expargs__p x y))))""",
      """
-(define-fun p ((x!1 Bool) (x!2 Real)) Bool (or (and (= x!2 0.0) x!1) (and (= x!2 1.0) (not x!1))))"""),
+(define-fun p ((x!1 Bool) (x!2 Real)) Bool (or (and (= x!1 true) (= x!2 0.0)) (and (= x!1 false) (= x!2 1.0))))"""),
 ]
 
 sat_tests = [
-    ("empty", # >>> check that this goes to predabst
+    ("empty",
      "",
      ""),
 
@@ -621,7 +630,7 @@ sat_tests = [
      """
 (define-fun p ((x!1 Int)) Bool (= x!1 0))"""),
 
-    # >>> why is this significant?
+    # Predicate refinement with a predicate symbol of arity 0.
     ("refine-arity-0",
      """
 (declare-fun p () Bool)
@@ -740,7 +749,7 @@ sat_tests = [
                        ("summarize-cubes", "true")], "bodyassumptions"), infer_tests)
 
 unsat_tests = [
-    ("empty", # >>> check that this goes to predabst
+    ("empty",
      """
 (assert false)"""),
 
@@ -768,7 +777,7 @@ unsat_tests = [
 (assert (forall ((x Int) (y Int)) (p x y)))
 (assert (forall ((x Int) (y Int)) (not (p x y))))"""),
 
-    # >>>
+    # The problem is unsatisfiable with a non-trivial counterexample.
     ("infer-discrete",
      """
 (declare-fun p (Int) Bool)
@@ -779,7 +788,8 @@ unsat_tests = [
 (assert (not (p 4)))
 (assert (forall ((x Int)) (=> (and (= x 0) (= x 1) (= x 2) (= x 3) (= x 4)) (__pred__p x))))"""),
 
-    # >>>
+    # Free variables in the body of the rule must be eliminated when
+    # determining reachability without abstraction.
     ("non-head-vars",
      """
 (declare-fun p (Int) Bool)
@@ -905,7 +915,7 @@ unknown_tests = [
 (assert (forall ((x Int) (y Int)) (=> (>= (* 3 (+ x y)) 1) (not (p x y)))))""",
      "incomplete"),
 
-    # Predicate refinement (>>> or determination of reachability without abstraction?) fails due to a non-linear expression.
+    # Predicate refinement fails due to a non-linear expression.
     make_pred_refine_test("mul", 2, "(<= (* x y) 2)", None),
     make_pred_refine_test("div", 2, "(<= (div x y) 2)", None),
     make_pred_refine_test("mod", 1, "(<= (mod x 2) 0)", None),

@@ -287,15 +287,15 @@ def make_random_sat_test(name, dag,
     if templates:
         declare_extra_template_constraint(len(templates))
 
-    #print name
-    #for i in sorted(dag):
-    #    print i, pred[i], arity[i], dag[i], bounds[i]
-
     code = s.to_smt2()
     assert '(check-sat)' in code
     code = code[:code.index('(check-sat)')]
 
-    if (shared_preds_probability == 0.0) and (initial_preds_probability == 0.0) and (arg_names_probability == 0.0) and (templates_probability == 0.0): # >>> :(
+    if (shared_preds_probability == 0.0) and (initial_preds_probability == 0.0) and (arg_names_probability == 0.0) and (templates_probability == 0.0):
+        # When any of these options are used, it's too hard to predict
+        # the model that predabst will calculate.
+        model = None
+    else:
         def sum_expr(xs):
             assert len(xs) > 0
             if len(xs) == 1:
@@ -315,8 +315,6 @@ def make_random_sat_test(name, dag,
                 s = "(>= %s 0)" % sum_expr(xs + [str(-bounds[i])])
             return "(define-fun %s (%s) Bool %s)" % (pred[i], " ".join("(x!%d Int)" % (j + 1) for j in range(arity[i])), s)
         model = "\n" + "\n".join(make_model(i) for i in sorted(dag))
-    else:
-        model = None
 
     return (name, code, model)
 

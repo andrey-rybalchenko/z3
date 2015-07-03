@@ -131,8 +131,8 @@ unknown_tests = [
 (assert (forall ((x Int) (y Int) (z Int) (w Int)) (=> (and (> x 0) (> y 0) (> z 0) (<= z 5) (= (+ (* x x) (* y y)) (* z z))) (__pred____dwf__p x z y w))))""",
      "(underlying-solver (incomplete (theory arithmetic)))"),
 
-    # The node is reachable without abstraction (>>> obvious?); however it is not well-founded
-    # without abstraction (the graph of p is {(1,1,1,0), (3,5,4,0), (4,5,3,0)}), but the solver is
+    # The node is reachable without abstraction; however it is not well-founded without
+    # abstraction (the graph of p is {(1,1,1,0), (3,5,4,0), (4,5,3,0)}), but the solver is
     # not able to determine this.
     ("pythagoras-refine-wf",
      """
@@ -140,8 +140,8 @@ unknown_tests = [
 (assert (forall ((x Int) (y Int) (z Int)) (=> (and (> x 0) (> y 0) (> z 0) (<= z 5) (= (+ (* x x) (* y y)) (* z z))) (__dwf__p x z y 0))))""",
      "(underlying-solver (incomplete (theory arithmetic)))"),
 
-    # The node is reachable without abstraction (>>> obvious?); however it is not well-founded
-    # without abstraction (the graph of p is {(1,1,1,5), (3,5,4,5), (4,5,3,5)}, which admits a
+    # The node is reachable without abstraction; however it is not well-founded without
+    # abstraction (the graph of p is {(1,1,1,5), (3,5,4,5), (4,5,3,5)}, which admits a
     # cycle), but the solver is not able to determine this.
     ("pythagoras-refine-not-wf",
      """
