@@ -36,7 +36,11 @@ extra_args = args.extra_args
 filter = args.filter
 
 z3root = os.path.join(os.path.dirname(__file__), r"..\..\..\..")
-z3exe = os.path.join(z3root, "build" if debug else "build-release", "z3")
+z3exe = os.path.join(z3root, "build" if debug else "build-release", "z3.exe")
+if not os.path.exists(z3exe):
+    print "Error: no", os.path.basename(z3exe), "in", os.path.abspath(os.path.dirname(z3exe))
+    sys.exit(1)
+
 z3cmd = [z3exe] + Z3OPTS + extra_args
 z3cmd.append("timeout=%d" % timeout)
 if use_asserts:
