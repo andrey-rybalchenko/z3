@@ -81,16 +81,16 @@ namespace predabst {
         vector<node_info*>                            m_nodes;
         obj_map<symbol_info const, node_vector>       m_max_reach_nodes;
         node_vector                                   m_node_worklist;
-        counterexample_kind							  m_counterexample_kind;
-        node_info const*							  m_counterexample_node;
-        smt_params									  m_fparams;
-        scoped_ptr<smt::kernel>						  m_solver;
-        mutable simplifier							  m_simplifier;
-        fixedpoint_params const&					  m_fp_params;
+        counterexample_kind                           m_counterexample_kind;
+        node_info const*                              m_counterexample_node;
+        smt_params                                    m_fparams;
+        scoped_ptr<smt::kernel>                       m_solver;
+        mutable simplifier                            m_simplifier;
+        fixedpoint_params const&                      m_fp_params;
         mutable cancellation_manager&                 m_cancellation_manager;
-        mutable core_stats&          			      m_stats;
-        subst_util						              m_subst;
-        ast_manager&								  m;
+        mutable core_stats&                           m_stats;
+        subst_util                                    m_subst;
+        ast_manager&                                  m;
 
     public:
         imp(vector<symbol_info*> const& symbols, vector<rule_info*> const& rules, expr_ref_vector const& template_param_values, fixedpoint_params const& fp_params, cancellation_manager& cm, ast_manager& m, core_stats& stats) :
@@ -521,7 +521,7 @@ namespace predabst {
         }
 
         bool model_eval_true(model_evaluator& ev, expr_ref const& cube) const {
-            if (m_fp_params.predabst_summarize_cubes()) { // >>> and not summarize_via_iff?
+            if (m_fp_params.predabst_summarize_cubes()) {
                 expr_ref val = model_eval(cube, ev);
                 CASSERT("predabst", m.is_true(val) || m.is_false(val) || val == cube);
                 return !m.is_false(val);
@@ -733,7 +733,6 @@ namespace predabst {
                             node_info const* node = *it;
                             expr_ref cube(mk_conj(pos_cubes[j]), m);
                             // No need to evaluate P with respect to the model when we know that the model already satisfies P.
-                            // >>> This optimization is probably not worth anything if the "cubes" here were guard_vars.
                             if ((m_fp_params.predabst_skip_singleton_model_eval() && (pos_cubes.size() == 1)) || model_eval_true(*ev, cube)) {
                                 sat_pos_nodes.insert(node);
                                 sat_pos_cubes.push_back(pos_cubes[j]);
@@ -1148,7 +1147,7 @@ namespace predabst {
             out << "  Max reached nodes:" << std::endl;
             for (obj_map<symbol_info const, node_vector>::iterator it = m_max_reach_nodes.begin(); it != m_max_reach_nodes.end(); ++it) {
                 symbol_info const* si = it->m_key;
-                out << "    " << si << ": "	<< it->m_value << std::endl;
+                out << "    " << si << ": " << it->m_value << std::endl;
             }
             out << "  Worklist: " << m_node_worklist << std::endl;
             out << "=====================================\n";

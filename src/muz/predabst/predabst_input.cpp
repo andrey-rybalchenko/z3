@@ -23,7 +23,7 @@ Revision History:
 #include "fixedpoint_params.hpp"
 
 namespace predabst {
-	using datalog::to_string;
+    using datalog::to_string;
 
     static void failwith(std::string msg) {
         STRACE("predabst", tout << "Malformed input: " << msg << "\n";);
@@ -46,8 +46,7 @@ namespace predabst {
         subst_util                          m_subst;
         ast_manager&                        m;
         input_stats&                        m_stats;
-
-        fixedpoint_params const&            m_fp_params; // >>> doesn't belong here?
+        fixedpoint_params const&            m_fp_params;
 
     public:
         input_builder(ast_manager& m, input_stats& stats, fixedpoint_params const& fp_params) :
@@ -87,11 +86,11 @@ namespace predabst {
                 var_ref_vector vars = get_arg_vars(si->m_fdecl, m);
                 for (unsigned j = 0; j < vars.size(); ++j) {
                     if (si->m_arg_kinds[j] == symbol_info::abstracted_arg) {
-						si->m_abstracted_vars.push_back(vars.get(j));
-					}
+                        si->m_abstracted_vars.push_back(vars.get(j));
+                    }
                     else {
-						si->m_explicit_vars.push_back(vars.get(j));
-					}
+                        si->m_explicit_vars.push_back(vars.get(j));
+                    }
                 }
 
                 if (si->m_is_dwf) {
@@ -160,10 +159,10 @@ namespace predabst {
                 }
             }
 
-			m_stats.m_num_symbols = m_input->m_symbols.size();
-			m_stats.m_num_templates = m_input->m_templates.size();
+            m_stats.m_num_symbols = m_input->m_symbols.size();
+            m_stats.m_num_templates = m_input->m_templates.size();
             m_stats.m_num_rules = m_input->m_rules.size();
-			m_stats.m_num_template_params = m_input->m_template_vars.size();
+            m_stats.m_num_template_params = m_input->m_template_vars.size();
 
             STRACE("predabst", print_initial_state(tout););
         }

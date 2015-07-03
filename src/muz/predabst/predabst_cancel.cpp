@@ -18,7 +18,7 @@ Revision History:
 --*/
 #include "predabst_cancel.h"
 
-// >>> Need to make these ATOMIC blocks atomic with respect to one another.
+// XXX Need to make these ATOMIC blocks atomic with respect to one another.
 #define ATOMIC(X) do X while(0)
 
 namespace predabst {

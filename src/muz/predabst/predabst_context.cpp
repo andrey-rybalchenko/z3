@@ -88,8 +88,8 @@ namespace predabst {
             unsigned m_num_predicates_added;
             unsigned m_num_predicates_added_query_naming;
 
-			stats() { reset(); }
-			void reset() { memset(this, 0, sizeof(*this)); }
+            stats() { reset(); }
+            void reset() { memset(this, 0, sizeof(*this)); }
 
             void update(statistics& st) {
                 core_stats::update(st);
@@ -416,8 +416,8 @@ namespace predabst {
             expr_ref exp(m);
             bool result = md->eval(app->get_decl(), exp);
             CASSERT("predabst", result);
-			expr_free_vars sorts;
-			sorts(exp);
+            expr_free_vars sorts;
+            sorts(exp);
             expr_ref_vector subst(m);
             subst.reserve(sorts.size());
             for (unsigned i = 0; i < sorts.size(); ++i) {
@@ -518,7 +518,7 @@ namespace predabst {
                 CASSERT("predabst", solution.m_head.m_name < name2func_decl.size());
                 symbol_info* si = name2func_decl[solution.m_head.m_name];
                 CASSERT("predabst", si);
-				expr_ref pred = replace_args(solution.m_body, si->m_abstracted_vars, solution.m_head.m_args);
+                expr_ref pred = replace_args(solution.m_body, si->m_abstracted_vars, solution.m_head.m_args);
                 new_preds_added += maybe_add_pred(si, pred);
             }
             return (new_preds_added > 0);
@@ -909,7 +909,10 @@ namespace predabst {
             vector<linear_inequality> assertion_inequalities;
             for (unsigned i = 0; i < assertions.size(); ++i) {
                 assertion_inequalities.push_back(linear_inequality(vars.size(), m));
-                if (!assertion_inequalities.back().set_from_expr(to_nnf(expr_ref(assertions.get(i), m)), vars)) { // >>> to_nnf is a bit of a hack; perhaps the elimination of "not" should be put back into set_from_expr
+                // XXX The use of to_nnf is a bit of a hack and is overkill here; all we really
+                // want is to convert (not (< x y)) into (<= y x), for example, which our
+                // implementation of to_nnf happens to do as well.
+                if (!assertion_inequalities.back().set_from_expr(to_nnf(expr_ref(assertions.get(i), m)), vars)) {
                     STRACE("predabst", tout << "Cannot solve clauses: not a system of linear (in)equalities\n";);
                     return core_clause_solutions();
                 }
@@ -939,8 +942,6 @@ namespace predabst {
                 }
                 for (unsigned j = 0; j < clause.m_uninterp_body.size(); ++j) {
                     coeffs.push_back(1);
-                    // >>> TODO assert that head and body arguments are distinct uninterpreted constants
-                    // >>> TODO assert that the head arguments and the body arguments are the same (otherwise need to do substitution)
                     inequalities.push_back(name2solution.get(clause.m_uninterp_body[j].m_name));
                 }
                 name2solution.reserve(clause.m_head.m_name + 1, linear_inequality(vars.size(), m));
@@ -950,7 +951,6 @@ namespace predabst {
             core_clause_solutions solutions;
             for (unsigned i = 1; i < clauses.size(); ++i) { // skip clause 0
                 core_clause const& clause = clauses[i];
-                // >>> TODO: assert that body has no uninterpreted constants not in head
                 core_clause_solution solution(clause.m_head, name2solution[clause.m_head.m_name].to_expr(vars));
                 STRACE("predabst", tout << "Solution for clause " << i << ": " << solution << "\n";);
                 solutions.push_back(solution);

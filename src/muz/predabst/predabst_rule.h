@@ -24,10 +24,10 @@ Revision History:
 #include "predabst_util.h"
 
 namespace predabst {
-	using datalog::rule;
-	class rule_info;
+    using datalog::rule;
+    class rule_info;
 
-	// Represents a predicate symbol, either templated or not.
+    // Represents a predicate symbol, either templated or not.
     struct fdecl_info {
         func_decl* const m_fdecl;
 
@@ -50,18 +50,18 @@ namespace predabst {
         }
     };
 
-	// Represents a non-templated predicate symbol.
+    // Represents a non-templated predicate symbol.
     struct symbol_info : public fdecl_info {
-		enum arg_kind { abstracted_arg, explicit_arg };
-		
-		bool                     const m_is_dwf;
+        enum arg_kind { abstracted_arg, explicit_arg };
+        
+        bool                     const m_is_dwf;
         expr_ref_vector          m_initial_preds;
         expr_ref_vector          m_preds;
-		vector<arg_kind>         m_arg_kinds;
-		func_decl_ref_vector     m_var_names;
-		var_ref_vector           m_abstracted_vars;
+        vector<arg_kind>         m_arg_kinds;
+        func_decl_ref_vector     m_var_names;
+        var_ref_vector           m_abstracted_vars;
         var_ref_vector           m_explicit_vars;
-		vector<rule_info const*> m_users;
+        vector<rule_info const*> m_users;
 
         symbol_info(func_decl* fdecl, bool is_dwf, ast_manager& m) :
             fdecl_info(fdecl),
@@ -71,11 +71,11 @@ namespace predabst {
             m_var_names(m),
             m_abstracted_vars(m),
             m_explicit_vars(m) {
-			m_arg_kinds.reserve(m_fdecl->get_arity());
-			m_var_names.reserve(m_fdecl->get_arity());
+            m_arg_kinds.reserve(m_fdecl->get_arity());
+            m_var_names.reserve(m_fdecl->get_arity());
         }
 
-		// Returns a list of fresh constants of the correct types to be the abstracted arguments to m_fdecl.
+        // Returns a list of fresh constants of the correct types to be the abstracted arguments to m_fdecl.
         expr_ref_vector get_fresh_abstracted_args(char const* prefix) const {
             ast_manager& m = m_preds.m();
             expr_ref_vector args = get_arg_fresh_consts(m_fdecl, prefix, m);
@@ -89,7 +89,7 @@ namespace predabst {
         }
     };
 
-	// Represents a templated predicate symbol.
+    // Represents a templated predicate symbol.
     struct template_info : public fdecl_info {
         var_ref_vector const m_vars;
         expr_ref       const m_body;
@@ -100,24 +100,24 @@ namespace predabst {
             m_body(body) {
         }
 
-		// Returns the body of the template, having substituted args for the parameters to m_fdecl.
+        // Returns the body of the template, having substituted args for the parameters to m_fdecl.
         expr_ref get_body_from_args(expr_ref_vector const& args, subst_util& subst) const {
             CASSERT("predabst", args.size() == m_vars.size());
             return subst.apply(m_body, subst.build(m_vars, args));
         }
 
-		// Returns the body of the template, having substituted extras for the extra template parameters.
+        // Returns the body of the template, having substituted extras for the extra template parameters.
         expr_ref get_body_from_extras(expr_ref_vector const& extras, subst_util& subst) const {
             return inv_shift(subst.apply(m_body, extras), extras.size());
         }
     };
 
-	// Represents a rule as used by predabst.  Note that:
-	// (a) the API exposed by rule_info hides the use of templated predicate symbol by the
+    // Represents a rule as used by predabst.  Note that:
+    // (a) the API exposed by rule_info hides the use of templated predicate symbol by the
     //     rule: the corresponding templates are incorporated into the interpreted body;
-	// (b) predabst may decompose a datalog::rule into more than one rule_info, each with
-	//     the same set of predicate symbols but with different interpreted bodies, in
-	//     order to ensure that the interpreted body of each rule is free of disjunctions.
+    // (b) predabst may decompose a datalog::rule into more than one rule_info, each with
+    //     the same set of predicate symbols but with different interpreted bodies, in
+    //     order to ensure that the interpreted body of each rule is free of disjunctions.
     class rule_info {
         unsigned             const m_id;
         rule*                const m_rule;
@@ -138,44 +138,44 @@ namespace predabst {
             m(m) {
         }
 
-		// Returns the number of predicate symbols in the tail of the rule.
+        // Returns the number of predicate symbols in the tail of the rule.
         unsigned get_tail_size() const {
             return m_tail_symbols.size();
         }
 
-		// Returns the predicate symbol at the head of the rule, or NULL if
-		// the head of the rule is false.
+        // Returns the predicate symbol at the head of the rule, or NULL if
+        // the head of the rule is false.
         symbol_info* get_decl() const {
             return m_head_symbol;
         }
 
-		// Returns the i'th predicate symbol in the tail of the rule.
+        // Returns the i'th predicate symbol in the tail of the rule.
         symbol_info* get_decl(unsigned i) const {
             CASSERT("predabst", i < m_tail_symbols.size());
             return m_tail_symbols[i];
         }
 
-		// Returns the list of actual abstracted arguments to the predicate symbol
-		// at the head of the rule, or the empty list if the head of the rule is false.
+        // Returns the list of actual abstracted arguments to the predicate symbol
+        // at the head of the rule, or the empty list if the head of the rule is false.
         expr_ref_vector get_abstracted_args() const;
 
-		// Returns the list of actual explicit arguments to the predicate symbol
-		// at the head of the rule, or the empty list if the head of the rule is false.
-		expr_ref_vector get_explicit_args() const;
+        // Returns the list of actual explicit arguments to the predicate symbol
+        // at the head of the rule, or the empty list if the head of the rule is false.
+        expr_ref_vector get_explicit_args() const;
 
-		// Returns the list of actual abstracted arguments to the i'th predicate symbol
-		// in the tail of the rule.
+        // Returns the list of actual abstracted arguments to the i'th predicate symbol
+        // in the tail of the rule.
         expr_ref_vector get_abstracted_args(unsigned i) const;
 
-		// Returns the list of actual explicit arguments to the i'th predicate symbol
-		// in the tail of the rule.
+        // Returns the list of actual explicit arguments to the i'th predicate symbol
+        // in the tail of the rule.
         expr_ref_vector get_explicit_args(unsigned i) const;
 
-		// Returns the interpreted body of the rule, as a list of conjuncts in NNF.
-		expr_ref_vector get_body(expr_ref_vector const& template_params, subst_util const& subst) const;
+        // Returns the interpreted body of the rule, as a list of conjuncts in NNF.
+        expr_ref_vector get_body(expr_ref_vector const& template_params, subst_util const& subst) const;
 
-		// Returns the variables used by the rule.
-		used_vars get_used_vars() const;
+        // Returns the variables used by the rule.
+        used_vars get_used_vars() const;
 
         unsigned hash() const {
             return m_id;
