@@ -406,7 +406,7 @@ sat_tests = [
 (declare-fun p (Int Int) Bool)
 (declare-fun __pred__p (Int Int) Bool)
 (assert (forall ((x Int) (y Int)) (=> (<= x y) (p x y))))
-(assert (forall ((x Int) (y Int)) (=> (and (<= x y) (>= y x) (< x (+ y 1)) (> (+ y 1) x) (<= (+ x 1) (+ y 1)) (>= (- x) (- y)) (not (> x y)) (not (< y x)) (not (>= x (+ y 1))) (not (<= (+ y 1) x))) (__pred__p x))))""",
+(assert (forall ((x Int) (y Int)) (=> (and (<= x y) (>= y x) (< x (+ y 1)) (> (+ y 1) x) (<= (+ x 1) (+ y 1)) (>= (- x) (- y)) (not (> x y)) (not (< y x)) (not (>= x (+ y 1))) (not (<= (+ y 1) x))) (__pred__p x y))))""",
      """
 (define-fun p ((x!1 Int) (x!2 Int)) Bool (<= x!1 x!2))"""),
 
