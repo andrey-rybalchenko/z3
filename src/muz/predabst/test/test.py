@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(description='Run predabst test cases.')
 parser.add_argument('--release', action='store_true', help='use release build of Z3 (default: use debug build of Z3); implies --no-asserts and --no-tracing')
 parser.add_argument('--no-asserts', action='store_true', help='disable asserts within predabst (default: asserts are enabled)')
 parser.add_argument('--no-tracing', action='store_true', help='disable tracing within predabst (default: tracing is enabled)')
-parser.add_argument('--timeout', type=int, default=300, metavar='T', help='timeout (in seconds) for each run of Z3 (default: 300s)')
+parser.add_argument('--timeout', type=int, default=10, metavar='T', help='timeout (in seconds) for each run of Z3 (default: 10s)')
 parser.add_argument('--arg', action='append', metavar='ARG', dest='extra_args', default=[], help='additional argument to be passed to Z3 (may be specified multiple times)')
 parser.add_argument('filter', metavar='FILTER', nargs='*', help='filter for test file names (prefix match)')
 
